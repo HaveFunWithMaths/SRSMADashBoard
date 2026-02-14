@@ -1,0 +1,836 @@
+{
+  "Class_XI": {
+    "Maths": {
+      "subjectName": "Maths",
+      "className": "Class_XI",
+      "topics": [
+        {
+          "topicName": "Circles",
+          "date": "2026-04-07T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 56.0,
+              "comments": "excellent doing good"
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 55.0,
+              "comments": "excellent"
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 47.0,
+              "comments": "can do better little more practice is needed"
+            },
+            {
+              "name": "Abhinav",
+              "marks": 38.0,
+              "comments": "can do much better, practice more"
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 34.0,
+              "comments": "can do better by more practice time"
+            },
+            {
+              "name": "Ishan",
+              "marks": 34.0,
+              "comments": "can improve a lot .need to spend time in more number of questions"
+            },
+            {
+              "name": "Puneeth",
+              "marks": 30.0,
+              "comments": "can do better, practice more become more serious towards academics.."
+            },
+            {
+              "name": "Tarun",
+              "marks": 30.0,
+              "comments": "has learnt better this time .but can improve more by giving time to practice"
+            },
+            {
+              "name": "Abrar",
+              "marks": 28.0,
+              "comments": "can do much better,lot off silly mistakes.pls practice more"
+            },
+            {
+              "name": "Karthik",
+              "marks": 26.0,
+              "comments": "a lot of scope of improvement is there will need to be more serious in prepartion will need to give more time in solving problems"
+            },
+            {
+              "name": "Krishna",
+              "marks": 25.0,
+              "comments": "avoid silly mistakes need more practice"
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 24.0,
+              "comments": "you are doing lot of silly mistakes,pls practice more &carefully avoid mistake"
+            },
+            {
+              "name": "Manideep",
+              "marks": 24.0,
+              "comments": "can avoid silly mistakes.should do a lilltle more pratice"
+            },
+            {
+              "name": "Sushil",
+              "marks": 17.0,
+              "comments": "can learn &perform better needs to do a lot of practice .rewrite test after 3days"
+            },
+            {
+              "name": "Aniesh",
+              "marks": 7.0,
+              "comments": "Did not study at all in the weekend. Has to write Re-Test after solving 20 questions assignment after 3 days."
+            }
+          ]
+        },
+        {
+          "topicName": "Parabola",
+          "date": "2026-04-14T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 48.0,
+              "comments": "Doing good. To improve Solve large number of EAMCETproblems"
+            },
+            {
+              "name": "Abrar",
+              "marks": 39.0,
+              "comments": "Can do better. Increase your practice time."
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 34.0,
+              "comments": "Should do much more practice"
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 33.0,
+              "comments": "Doing good but can do better"
+            },
+            {
+              "name": "Aniesh",
+              "marks": 29.0,
+              "comments": "Can do better needs more practice"
+            },
+            {
+              "name": "Abhinav",
+              "marks": 27.0,
+              "comments": "Needs to do a lot more practice"
+            },
+            {
+              "name": "Ishan",
+              "marks": 27.0,
+              "comments": "Should do more practice"
+            },
+            {
+              "name": "Karthik",
+              "marks": 25.0,
+              "comments": "Should practice more"
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 25.0,
+              "comments": "Needs more practice and accuracy."
+            },
+            {
+              "name": "Sushil",
+              "marks": 22.0,
+              "comments": "Needs to revise and practice everything more"
+            },
+            {
+              "name": "Puneeth",
+              "marks": 21.0,
+              "comments": "Can do better. Increase your practice time"
+            },
+            {
+              "name": "Tarun",
+              "marks": 18.0,
+              "comments": "Can improve a lot if practices more"
+            },
+            {
+              "name": "Krishna",
+              "marks": 8.0,
+              "comments": "Needs a lot more practice"
+            },
+            {
+              "name": "Manideep",
+              "marks": 2.0,
+              "comments": "Lots of practice needs to be done"
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": null,
+              "comments": null
+            }
+          ]
+        },
+        {
+          "topicName": "Eliipse",
+          "date": "2026-04-27T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 32.0,
+              "comments": "Doing good. To improve Solve large number of EAMCETproblems"
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 28.0,
+              "comments": "Doing good. To improve Solve large number of EAMCETproblems"
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 24.0,
+              "comments": "Doing good. To improve Solve large number of EAMCETproblems"
+            },
+            {
+              "name": "Puneeth",
+              "marks": 23.0,
+              "comments": "Doing good. To improve Solve large number of EAMCETproblems"
+            },
+            {
+              "name": "Ishan",
+              "marks": 22.0,
+              "comments": "Doing good. To improve Solve large number of EAMCETproblems"
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 17.0,
+              "comments": "Needs more conceptual clarity. Revise class notes well and solve RD Sharma"
+            },
+            {
+              "name": "Abrar",
+              "marks": 15.0,
+              "comments": "Needs more conceptual clarity. Revise class notes well and solve RD Sharma"
+            },
+            {
+              "name": "Karthik",
+              "marks": 14.0,
+              "comments": "Needs more conceptual clarity. Revise class notes well and solve RD Sharma"
+            },
+            {
+              "name": "Abhinav",
+              "marks": 13.0,
+              "comments": "Needs more conceptual clarity. Revise class notes well and solve RD Sharma"
+            },
+            {
+              "name": "Manideep",
+              "marks": 13.0,
+              "comments": "Needs more conceptual clarity. Revise class notes well and solve RD Sharma"
+            },
+            {
+              "name": "Tarun",
+              "marks": 10.0,
+              "comments": "Needs more conceptual clarity. Revise class notes well and solve RD Sharma"
+            },
+            {
+              "name": "Sushil",
+              "marks": 8.0,
+              "comments": "Pay attention in class properly and revise class notes more. Solve RD Sharma"
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 6.0,
+              "comments": "Pay attention in class properly and revise class notes more. Solve RD Sharma"
+            },
+            {
+              "name": "Aniesh",
+              "marks": 6.0,
+              "comments": "Pay attention in class properly and revise class notes more. Solve RD Sharma"
+            },
+            {
+              "name": "Krishna",
+              "marks": 6.0,
+              "comments": "Pay attention in class properly and revise class notes more. Solve RD Sharma"
+            }
+          ]
+        },
+        {
+          "topicName": "Hyperbola",
+          "date": "2026-05-05T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Jagat Pavitra",
+              "marks": 37.0,
+              "comments": "Can do much better. You need to manage your time better and give more time to practice questions"
+            },
+            {
+              "name": "Sumedh",
+              "marks": 34.0,
+              "comments": "Need to have more greep on these concepts"
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 29.0,
+              "comments": "Discuss with me about why are you unable to solve the basic questions in this paper"
+            },
+            {
+              "name": "Aniesh",
+              "marks": 27.0,
+              "comments": "Continue doing practice"
+            },
+            {
+              "name": "Abrar",
+              "marks": 25.0,
+              "comments": "Solve atleast 50-100 questions of EAMCET, then do all assignments again, then solve PYQs of JEE. You need to get more grip on the concepts"
+            },
+            {
+              "name": "Abhinav",
+              "marks": 25.0,
+              "comments": "Solve atleast 50-100 questions of EAMCET, then do all assignments again, then solve PYQs of JEE"
+            },
+            {
+              "name": "Manideep",
+              "marks": 25.0,
+              "comments": "Solve atleast 50-100 questions of EAMCET, then do all assignments again, then solve PYQs of JEE"
+            },
+            {
+              "name": "Ishan",
+              "marks": 22.0,
+              "comments": "Discuss with me reasons for not being able to solve easier questions on this paper"
+            },
+            {
+              "name": "Sushil",
+              "marks": 22.0,
+              "comments": "Solve atleast 50-100 questions of EAMCET, then do all assignments again, then solve PYQs of JEE"
+            },
+            {
+              "name": "Krishna",
+              "marks": 19.0,
+              "comments": "Solve 100 questions of EAMCET, then do all assignments again, then solve PYQs of JEE"
+            },
+            {
+              "name": "Puneeth",
+              "marks": 17.0,
+              "comments": "Explain to me why even easy questions you are unable to solve in this paper"
+            },
+            {
+              "name": "Karthik",
+              "marks": 17.0,
+              "comments": "Solve 50-100 EAMCET questions, then assignment"
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 15.0,
+              "comments": "Explain to me why even easy questions you are unable to solve"
+            },
+            {
+              "name": "Tarun",
+              "marks": 12.0,
+              "comments": "You need to solve atleast 50-100 questions of EAMCET level on all these concepts. Then solve the assignments again. Your practice level is less hence you are getting stuck in the middle"
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 8.0,
+              "comments": "Explain to me why you are unable to solve even easy questions in this paper. Why you make so many silly mistakes"
+            }
+          ]
+        },
+        {
+          "topicName": "GrandTest",
+          "date": "2026-05-12T00:00:00",
+          "totalMarks": 100,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 77.0,
+              "comments": null
+            },
+            {
+              "name": "Abhinav",
+              "marks": 51.0,
+              "comments": null
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 44.0,
+              "comments": null
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 41.0,
+              "comments": null
+            },
+            {
+              "name": "Puneeth",
+              "marks": 39.0,
+              "comments": null
+            },
+            {
+              "name": "Tarun",
+              "marks": 38.0,
+              "comments": null
+            },
+            {
+              "name": "Abrar",
+              "marks": 37.0,
+              "comments": null
+            },
+            {
+              "name": "Ishan",
+              "marks": 37.0,
+              "comments": null
+            },
+            {
+              "name": "Karthik",
+              "marks": 33.0,
+              "comments": null
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 28.0,
+              "comments": null
+            },
+            {
+              "name": "Aniesh",
+              "marks": 27.0,
+              "comments": null
+            },
+            {
+              "name": "Manideep",
+              "marks": 26.0,
+              "comments": null
+            },
+            {
+              "name": "Krishna",
+              "marks": 22.0,
+              "comments": null
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 18.0,
+              "comments": null
+            },
+            {
+              "name": "Sushil",
+              "marks": 4.0,
+              "comments": null
+            }
+          ]
+        }
+      ]
+    },
+    "Physics": {
+      "subjectName": "Physics",
+      "className": "Class_XI",
+      "topics": [
+        {
+          "topicName": "ElectroStatics1",
+          "date": "2026-04-13T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 60.0,
+              "comments": null
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 60.0,
+              "comments": null
+            },
+            {
+              "name": "Ishan",
+              "marks": 56.0,
+              "comments": null
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 51.0,
+              "comments": null
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 46.0,
+              "comments": null
+            },
+            {
+              "name": "Abrar",
+              "marks": 46.0,
+              "comments": null
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 40.0,
+              "comments": null
+            },
+            {
+              "name": "Manideep",
+              "marks": 39.0,
+              "comments": null
+            },
+            {
+              "name": "Karthik",
+              "marks": 28.0,
+              "comments": null
+            },
+            {
+              "name": "Abhinav",
+              "marks": 27.0,
+              "comments": null
+            },
+            {
+              "name": "Krishna",
+              "marks": 24.0,
+              "comments": null
+            },
+            {
+              "name": "Sushil",
+              "marks": 23.0,
+              "comments": null
+            },
+            {
+              "name": "Tarun",
+              "marks": 23.0,
+              "comments": null
+            },
+            {
+              "name": "Puneeth",
+              "marks": 22.0,
+              "comments": null
+            },
+            {
+              "name": "Aniesh",
+              "marks": 6.0,
+              "comments": null
+            }
+          ]
+        },
+        {
+          "topicName": "ElectroStatics2",
+          "date": "2026-04-20T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 60.0,
+              "comments": null
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 55.0,
+              "comments": null
+            },
+            {
+              "name": "Ishan",
+              "marks": 52.0,
+              "comments": null
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 46.0,
+              "comments": null
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": null,
+              "comments": null
+            },
+            {
+              "name": "Abrar",
+              "marks": 51.0,
+              "comments": null
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 30.0,
+              "comments": null
+            },
+            {
+              "name": "Manideep",
+              "marks": 48.0,
+              "comments": null
+            },
+            {
+              "name": "Karthik",
+              "marks": 35.0,
+              "comments": null
+            },
+            {
+              "name": "Abhinav",
+              "marks": 42.0,
+              "comments": null
+            },
+            {
+              "name": "Krishna",
+              "marks": 35.0,
+              "comments": null
+            },
+            {
+              "name": "Sushil",
+              "marks": 30.0,
+              "comments": null
+            },
+            {
+              "name": "Tarun",
+              "marks": 13.0,
+              "comments": null
+            },
+            {
+              "name": "Puneeth",
+              "marks": 30.0,
+              "comments": null
+            },
+            {
+              "name": "Aniesh",
+              "marks": 11.0,
+              "comments": null
+            }
+          ]
+        },
+        {
+          "topicName": "ElectroStatics3",
+          "date": "2026-04-27T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 48.0,
+              "comments": null
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 41.0,
+              "comments": null
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 20.0,
+              "comments": null
+            },
+            {
+              "name": "Ishan",
+              "marks": 18.0,
+              "comments": null
+            },
+            {
+              "name": "Abrar",
+              "marks": 18.0,
+              "comments": null
+            },
+            {
+              "name": "Aniesh",
+              "marks": 15.0,
+              "comments": null
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 14.0,
+              "comments": null
+            },
+            {
+              "name": "Karthik",
+              "marks": 12.0,
+              "comments": null
+            },
+            {
+              "name": "Krishna",
+              "marks": 10.0,
+              "comments": null
+            },
+            {
+              "name": "Manideep",
+              "marks": 8.0,
+              "comments": null
+            },
+            {
+              "name": "Puneeth",
+              "marks": 8.0,
+              "comments": null
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 7.0,
+              "comments": null
+            },
+            {
+              "name": "Abhinav",
+              "marks": 7.0,
+              "comments": null
+            },
+            {
+              "name": "Sushil",
+              "marks": 7.0,
+              "comments": null
+            },
+            {
+              "name": "Tarun",
+              "marks": 4.0,
+              "comments": null
+            }
+          ]
+        },
+        {
+          "topicName": "GrandTest",
+          "date": "2026-05-04T00:00:00",
+          "totalMarks": 100,
+          "students": [
+            {
+              "name": "Sumedh",
+              "marks": 76.0,
+              "comments": null
+            },
+            {
+              "name": "Chandrahaas",
+              "marks": 72.0,
+              "comments": null
+            },
+            {
+              "name": "Abrar",
+              "marks": 53.0,
+              "comments": null
+            },
+            {
+              "name": "Tarun",
+              "marks": 52.0,
+              "comments": null
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 48.0,
+              "comments": null
+            },
+            {
+              "name": "Abhinav",
+              "marks": 40.0,
+              "comments": null
+            },
+            {
+              "name": "Ishan",
+              "marks": 39.0,
+              "comments": null
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 45.0,
+              "comments": null
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 35.0,
+              "comments": null
+            },
+            {
+              "name": "Sushil",
+              "marks": 28.0,
+              "comments": null
+            },
+            {
+              "name": "Krishna",
+              "marks": 26.0,
+              "comments": null
+            },
+            {
+              "name": "Aniesh",
+              "marks": 22.0,
+              "comments": null
+            },
+            {
+              "name": "Puneeth",
+              "marks": 18.0,
+              "comments": null
+            },
+            {
+              "name": "Karthik",
+              "marks": 9.0,
+              "comments": null
+            },
+            {
+              "name": "Manideep",
+              "marks": 4.0,
+              "comments": null
+            }
+          ]
+        },
+        {
+          "topicName": "Current Electricity",
+          "date": "2026-05-26T00:00:00",
+          "totalMarks": 60,
+          "students": [
+            {
+              "name": "Chandrahaas",
+              "marks": 56.0,
+              "comments": null
+            },
+            {
+              "name": "Sumedh",
+              "marks": 51.0,
+              "comments": null
+            },
+            {
+              "name": "Jagat Pavitra",
+              "marks": 50.0,
+              "comments": null
+            },
+            {
+              "name": "Abhinav",
+              "marks": 47.0,
+              "comments": null
+            },
+            {
+              "name": "Ishan",
+              "marks": 43.0,
+              "comments": null
+            },
+            {
+              "name": "Mubashshir",
+              "marks": 42.0,
+              "comments": null
+            },
+            {
+              "name": "Abrar",
+              "marks": 40.0,
+              "comments": null
+            },
+            {
+              "name": "Karthik",
+              "marks": 40.0,
+              "comments": null
+            },
+            {
+              "name": "Krishna",
+              "marks": 38.0,
+              "comments": null
+            },
+            {
+              "name": "Tarun",
+              "marks": 32.0,
+              "comments": null
+            },
+            {
+              "name": "Manideep",
+              "marks": 31.0,
+              "comments": null
+            },
+            {
+              "name": "Puneeth",
+              "marks": 30.0,
+              "comments": null
+            },
+            {
+              "name": "Akhilesh",
+              "marks": 29.0,
+              "comments": null
+            },
+            {
+              "name": "Aniesh",
+              "marks": 29.0,
+              "comments": null
+            },
+            {
+              "name": "Sushil",
+              "marks": 28.0,
+              "comments": null
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
