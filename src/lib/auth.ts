@@ -97,5 +97,5 @@ export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt"
     },
-    secret: process.env.NEXTAUTH_SECRET || "fallback_secret_for_dev_only", // Should be in .env
+    secret: process.env.NEXTAUTH_SECRET,
 };
