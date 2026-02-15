@@ -56,8 +56,10 @@ function DashboardContent() {
 
             setData(jsonData);
 
-            // Extract subjects
-            const uniqueSubjects = Array.from(new Set(jsonData.map((d: any) => d.subject))) as string[];
+            // Extract subjects and inject Chemistry/Total even if no data
+            const dataSubjects = Array.from(new Set(jsonData.map((d: any) => d.subject))) as string[];
+            const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
             setSubjects(uniqueSubjects);
 
             if (uniqueSubjects.length > 0) {

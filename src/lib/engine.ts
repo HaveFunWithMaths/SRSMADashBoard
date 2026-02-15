@@ -89,10 +89,15 @@ export function processTopic(topic: TopicData): TopicData {
 
     const rankedStudents = calculateRanks(enrichedStudents);
 
+    const classAverage = calculateClassAverage(enrichedStudents);
+    const topperMarks = getTopperMarks(enrichedStudents);
+
     return {
         ...topic,
         students: rankedStudents,
-        classAverage: calculateClassAverage(enrichedStudents),
-        topperMarks: getTopperMarks(enrichedStudents)
+        classAverage,
+        topperMarks,
+        classAveragePercentage: calculatePercentage(classAverage, topic.totalMarks) ?? 0,
+        topperPercentage: calculatePercentage(topperMarks, topic.totalMarks) ?? 0
     };
 }
