@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import PerformanceChart from '@/components/PerformanceChart';
 import RankTrendChart from '@/components/RankTrendChart';
@@ -11,6 +11,8 @@ import PerformanceTable from '@/components/PerformanceTable';
 export default function Dashboard() {
     const { data: session, status } = useSession();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const studentParam = searchParams.get('student');
 
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,14 +26,29 @@ export default function Dashboard() {
     }, [status, router]);
 
     useEffect(() => {
+        if (status === 'loading') return;
+
+        if (session?.user?.role === 'teacher') {
+            if (!studentParam) {
+                router.push('/teacher');
+                return;
+            }
+        }
+
         if (session?.user?.name) {
             fetchData();
         }
-    }, [session]);
+    }, [session, status, studentParam]);
 
     const fetchData = async () => {
         try {
-            const res = await fetch(`/api/data?type=performance&student=${session?.user?.name}`);
+            // Determine which student to fetch: param if teacher, otherwise self
+            let studentToFetch = session?.user?.name;
+            if (session?.user?.role === 'teacher' && studentParam) {
+                studentToFetch = studentParam;
+            }
+
+            const res = await fetch(`/api/data?type=performance&student=${studentToFetch}`);
             if (!res.ok) throw new Error('Failed to fetch data');
             const jsonData = await res.json();
 
@@ -59,15 +76,25 @@ export default function Dashboard() {
 
     // Filter data by active subject
     const subjectData = data.filter(d => d.subject === activeSubject);
+    const displayedStudentName = (session.user.role === 'teacher' && studentParam) ? studentParam : session.user.name;
 
     return (
         <>
             <Header />
             <main className="container">
+                {session.user.role === 'teacher' && (
+                    <button
+                        onClick={() => router.push('/teacher')}
+                        className="mb-4 text-sm text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                        ← Back to Teacher Dashboard
+                    </button>
+                )}
+
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h2 className="text-xl font-bold text-primary">Student Performance</h2>
-                        <p className="text-sm text-muted">Welcome back, {session.user.name}</p>
+                        <p className="text-sm text-muted">Viewing data for: {displayedStudentName}</p>
                     </div>
                     {/* Subject Tabs */}
                     <div className="tabs" style={{ marginBottom: 0 }}>

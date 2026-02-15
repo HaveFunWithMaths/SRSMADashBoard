@@ -101,26 +101,49 @@ export default function TeacherDashboard() {
             <main className="container">
                 <h2 className="text-xl font-bold mb-4">Teacher Dashboard</h2>
 
-                <div className="card mb-4 flex gap-4 items-center">
-                    <div>
-                        <label className="block text-sm font-bold mb-1">Class</label>
-                        <select
-                            className="p-2 border rounded"
-                            value={selectedClass}
-                            onChange={e => setSelectedClass(e.target.value)}
-                        >
-                            {classes.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                <div className="card mb-4">
+                    <div className="flex gap-4 items-center flex-wrap">
+                        <div>
+                            <label className="block text-sm font-bold mb-1">Class</label>
+                            <select
+                                className="p-2 border rounded"
+                                value={selectedClass}
+                                onChange={e => setSelectedClass(e.target.value)}
+                            >
+                                {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold mb-1">Subject</label>
+                            <select
+                                className="p-2 border rounded"
+                                value={selectedSubject}
+                                onChange={e => setSelectedSubject(e.target.value)}
+                            >
+                                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-bold mb-1">Subject</label>
-                        <select
-                            className="p-2 border rounded"
-                            value={selectedSubject}
-                            onChange={e => setSelectedSubject(e.target.value)}
-                        >
-                            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+
+                    {/* Student Selector */}
+                    <div className="mt-4 pt-4 border-t">
+                        <label className="block text-sm font-bold mb-1">View Student Dashboard</label>
+                        <div className="flex gap-2 max-w-md">
+                            <select
+                                className="p-2 border rounded flex-grow"
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        router.push(`/dashboard?student=${e.target.value}`);
+                                    }
+                                }}
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Select a student to view details...</option>
+                                {Array.from(new Set(batchData.flatMap(t => t.students?.map((s: any) => s.name) || []))).sort().map((s: any) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
