@@ -1,9 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  --color-primary: #1a365d; /* Deep Navy Blue */
-  --color-secondary: #d4942a; /* Gold/Saffron */
-  --color-accent: #e8913a; /* Orange Accent */
+  --color-primary: #1a365d;
+  /* Deep Navy Blue */
+  --color-secondary: #d4942a;
+  /* Gold/Saffron */
+  --color-accent: #e8913a;
+  /* Orange Accent */
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
@@ -26,7 +29,12 @@ body {
   line-height: 1.5;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Outfit', sans-serif;
   color: var(--color-primary);
 }
@@ -185,7 +193,8 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.9rem;
 }
 
-.data-table th, .data-table td {
+.data-table th,
+.data-table td {
   padding: 0.75rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--color-border);
@@ -209,9 +218,23 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Heatmap Colors */
-.heatmap-high { background-color: rgba(16, 185, 129, 0.2) !important; color: #065f46; font-weight: 600; }
-.heatmap-mid { background-color: rgba(245, 158, 11, 0.2) !important; color: #92400e; font-weight: 600; }
-.heatmap-low { background-color: rgba(239, 68, 68, 0.2) !important; color: #991b1b; font-weight: 600; }
+.heatmap-high {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  color: #065f46;
+  font-weight: 600;
+}
+
+.heatmap-mid {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.heatmap-low {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  color: #991b1b;
+  font-weight: 600;
+}
 
 /* Tabs */
 .tabs {
@@ -243,16 +266,73 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Utilities */
-.text-center { text-align: center; }
-.mt-4 { margin-top: 1rem; }
-.mb-4 { margin-bottom: 1rem; }
-.flex { display: flex; }
-.gap-4 { gap: 1rem; }
-.justify-between { justify-content: space-between; }
-.items-center { align-items: center; }
+.text-center {
+  text-align: center;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.flex {
+  display: flex;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.items-center {
+  align-items: center;
+}
 
 @media (min-width: 768px) {
   .dashboard-grid {
-    grid-template-columns: 2fr 1fr; /* Graph takes more space */
+    grid-template-columns: 2fr 1fr;
+    /* Graph takes more space */
   }
+}
+
+/* Modern Back Button */
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1.25rem;
+  background-color: white;
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-border);
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  font-family: 'Outfit', sans-serif;
+  text-decoration: none;
+}
+
+.back-button:hover {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  transform: translateX(-4px);
+  box-shadow: 0 4px 12px rgba(26, 54, 93, 0.2);
+}
+
+.back-button svg {
+  transition: transform 0.3s ease;
+}
+
+.back-button:hover svg {
+  transform: translateX(-2px);
 }

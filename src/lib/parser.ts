@@ -205,7 +205,9 @@ export function getStudentData(studentName: string) {
                         date: topic.date,
                         totalMarks: topic.totalMarks,
                         classAverage: topic.classAverage,
-                        topperMarks: topic.topperMarks
+                        topperMarks: topic.topperMarks,
+                        classAveragePercentage: topic.classAveragePercentage,
+                        topperPercentage: topic.topperPercentage
                     });
                 }
             });

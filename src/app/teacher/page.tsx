@@ -40,7 +40,10 @@ export default function TeacherDashboard() {
             .then(data => {
                 if (Array.isArray(data)) {
                     setClasses(data);
-                    if (data.length > 0) setSelectedClass(data[0]);
+                    if (data.length > 0) {
+                        const defaultClass = data.find(c => c === 'Class_XII') || data[0];
+                        setSelectedClass(defaultClass);
+                    }
                 }
             });
     }, []);
@@ -100,8 +103,8 @@ export default function TeacherDashboard() {
 
     const chartData = batchData.map(topic => ({
         topic: topic.topicName,
-        'Class Average %': topic.classAveragePercentage ?? 0,
-        'Topper %': topic.topperPercentage ?? 0
+        'Class Average': topic.classAveragePercentage ?? 0,
+        'Topper': topic.topperPercentage ?? 0
     }));
 
     const tableData = topicDetails ? topicDetails.students.map((s: any) => ({
@@ -229,8 +232,8 @@ export default function TeacherDashboard() {
                                             formatter={(value: any, name: any) => [`${value}%`, name]}
                                         />
                                         <Legend wrapperStyle={{ paddingTop: '12px', fontSize: '0.85rem' }} />
-                                        <Bar dataKey="Class Average %" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="Topper %" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Class Average" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Topper" fill="#10b981" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>

@@ -63,7 +63,7 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                     <Line
                         type="monotone"
                         dataKey="classAveragePercentage"
-                        name="Class Avg"
+                        name="Class Average"
                         stroke="#8b5cf6"
                         strokeWidth={2}
                         strokeDasharray="5 5"
