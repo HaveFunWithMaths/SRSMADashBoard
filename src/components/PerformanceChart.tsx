@@ -4,9 +4,20 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 
 interface PerformanceChartProps {
     data: any[];
+    subject?: string;
 }
 
-export default function PerformanceChart({ data }: PerformanceChartProps) {
+const SUBJECT_COLORS: Record<string, string> = {
+    'Maths': '#1a365d',      // Navy
+    'Physics': '#7c3aed',    // Violet
+    'Chemistry': '#10b981',  // Emerald
+    'Total': '#f59e0b',      // Amber
+    'default': '#64748b'     // Slate
+};
+
+export default function PerformanceChart({ data, subject }: PerformanceChartProps) {
+    const subjectColor = SUBJECT_COLORS[subject || 'default'] || SUBJECT_COLORS['default'];
+
     return (
         <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer>
@@ -27,6 +38,7 @@ export default function PerformanceChart({ data }: PerformanceChartProps) {
                     />
                     <Tooltip
                         contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                        formatter={(value: any, name: any) => [`${value}%`, name]}
                     />
                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
 
@@ -34,25 +46,25 @@ export default function PerformanceChart({ data }: PerformanceChartProps) {
                         type="monotone"
                         dataKey="percentage"
                         name="Your Score"
-                        stroke="#1a365d"
+                        stroke={subjectColor}
                         strokeWidth={3}
-                        dot={{ r: 4, fill: '#1a365d', strokeWidth: 2 }}
+                        dot={{ r: 4, fill: subjectColor, strokeWidth: 2 }}
                         activeDot={{ r: 6 }}
                     />
                     <Line
                         type="monotone"
-                        dataKey="topperMarks"
+                        dataKey="topperPercentage"
                         name="Topper"
-                        stroke="#10b981"
+                        stroke="#ef4444"
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}
                     />
                     <Line
                         type="monotone"
-                        dataKey="classAverage"
+                        dataKey="classAveragePercentage"
                         name="Class Avg"
-                        stroke="#f59e0b"
+                        stroke="#8b5cf6"
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}

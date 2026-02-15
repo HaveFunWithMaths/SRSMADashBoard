@@ -16,6 +16,8 @@ export interface TopicData {
     // Computed fields
     classAverage?: number;
     topperMarks?: number;
+    classAveragePercentage?: number;
+    topperPercentage?: number;
 }
 
 export interface SubjectData {

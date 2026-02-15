@@ -8,12 +8,14 @@ import PerformanceChart from '@/components/PerformanceChart';
 import RankTrendChart from '@/components/RankTrendChart';
 import PerformanceTable from '@/components/PerformanceTable';
 
-export default function Dashboard() {
+import { Suspense } from 'react';
+
+function DashboardContent() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const searchParams = useSearchParams();
     const studentParam = searchParams.get('student');
-
+    // ... existing logic up to return ...
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<string[]>([]);
@@ -117,7 +119,7 @@ export default function Dashboard() {
                         <div className="dashboard-grid">
                             <div className="card">
                                 <h3 className="card-title">Performance Trend</h3>
-                                <PerformanceChart data={subjectData} />
+                                <PerformanceChart data={subjectData} subject={activeSubject} />
                             </div>
                             <div className="card">
                                 <h3 className="card-title">Rank Consistency</h3>
@@ -133,5 +135,13 @@ export default function Dashboard() {
                 )}
             </main>
         </>
+    );
+}
+
+export default function Dashboard() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <DashboardContent />
+        </Suspense>
     );
 }
