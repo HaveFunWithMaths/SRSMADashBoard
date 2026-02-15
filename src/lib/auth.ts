@@ -25,6 +25,10 @@ declare module "next-auth/jwt" {
     }
 }
 
+
+// Debug: Check if secret is loaded
+console.log("Auth Debug: NEXTAUTH_SECRET is set?", !!process.env.NEXTAUTH_SECRET);
+
 export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
