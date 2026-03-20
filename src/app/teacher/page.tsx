@@ -71,24 +71,34 @@ export default function TeacherDashboard() {
         fetch(`/api/data?type=batch&class=${selectedClass}&subject=${selectedSubject}`)
             .then(res => res.json())
             .then(data => {
+                let currentTopics: any[] = [];
+                let currentAllStudents = new Set<string>();
+
                 if (Array.isArray(data) && data.length > 0) {
                     const subject = data[0];
-                    const topics = subject.topics || [];
-                    setBatchData(topics);
+                    currentTopics = subject.topics || [];
+                    setBatchData(currentTopics);
                     // Extract unique student names from all topics
-                    const allStudents = new Set<string>();
-                    topics.forEach((t: any) => {
+                    currentTopics.forEach((t: any) => {
                         t.students?.forEach((s: any) => {
-                            if (s.name) allStudents.add(s.name);
+                            if (s.name) currentAllStudents.add(s.name);
                         });
                     });
-                    setStudents(Array.from(allStudents).sort());
+                    setStudents(Array.from(currentAllStudents).sort());
                 } else {
                     setBatchData([]);
                     setStudents([]);
                 }
-                setSelectedTopic(null);
-                setSelectedStudent('');
+
+                setSelectedTopic(prev => {
+                    if (prev && currentTopics.some((t: any) => t.topicName === prev)) return prev;
+                    return null;
+                });
+                
+                setSelectedStudent(prev => {
+                    if (prev && currentAllStudents.has(prev)) return prev;
+                    return '';
+                });
             })
             .finally(() => setLoading(false));
     }, [selectedClass, selectedSubject]);
@@ -424,7 +434,17 @@ export default function TeacherDashboard() {
                                                     {tableData.sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999)).map((student: any, idx: number) => (
                                                         <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
                                                             <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 'bold', color: '#7c3aed' }}>#{student.rank}</td>
-                                                            <td style={{ padding: '0.75rem', fontWeight: 500, color: '#1e293b' }}>{student.name}</td>
+                                                            <td 
+                                                                style={{ padding: '0.75rem', fontWeight: 500, color: '#7c3aed', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                onClick={() => {
+                                                                    setSelectedStudent(student.name);
+                                                                    setActiveTab('students');
+                                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                }}
+                                                                title="View Student Dashboard"
+                                                            >
+                                                                {student.name}
+                                                            </td>
                                                             <td style={{ padding: '0.75rem', textAlign: 'center', color: '#64748b' }}>
                                                                 {student.marks ?? '-'} <span style={{ fontSize: '0.8em', opacity: 0.7 }}>/ {student.totalMarks}</span>
                                                             </td>
@@ -476,7 +496,17 @@ export default function TeacherDashboard() {
 
                                 {selectedStudent ? (
                                     <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                                        <StudentDashboardView studentName={selectedStudent} />
+                                        <StudentDashboardView 
+                                            studentName={selectedStudent} 
+                                            onTopicClick={(topic, subject) => {
+                                                if (subject && subjects.includes(subject)) {
+                                                    setSelectedSubject(subject);
+                                                }
+                                                setSelectedTopic(topic);
+                                                setActiveTab('analysis');
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }}
+                                        />
                                     </div>
                                 ) : (
                                     <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', border: '2px dashed #f1f5f9', borderRadius: '0.5rem', marginTop: '1rem' }}>

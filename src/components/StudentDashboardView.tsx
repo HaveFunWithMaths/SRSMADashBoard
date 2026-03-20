@@ -9,9 +9,10 @@ interface StudentDashboardViewProps {
     studentName: string;
     showBackToTeacher?: boolean;
     onBack?: () => void;
+    onTopicClick?: (topic: string, subject: string) => void;
 }
 
-export default function StudentDashboardView({ studentName, showBackToTeacher, onBack }: StudentDashboardViewProps) {
+export default function StudentDashboardView({ studentName, showBackToTeacher, onBack, onTopicClick }: StudentDashboardViewProps) {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<string[]>([]);
@@ -87,7 +88,7 @@ export default function StudentDashboardView({ studentName, showBackToTeacher, o
 
                     <div className="card">
                         <h3 className="card-title text-lg mb-4">Detailed Report</h3>
-                        <PerformanceTable data={subjectData} />
+                        <PerformanceTable data={subjectData} onTopicClick={onTopicClick ? (topic) => onTopicClick(topic, activeSubject) : undefined} />
                     </div>
                 </>
             )}

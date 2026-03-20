@@ -2,9 +2,10 @@
 
 interface PerformanceTableProps {
     data: any[];
+    onTopicClick?: (topic: string) => void;
 }
 
-export default function PerformanceTable({ data }: PerformanceTableProps) {
+export default function PerformanceTable({ data, onTopicClick }: PerformanceTableProps) {
     // Sort by Marks Descending? User said "Default sorted by Marks (Descending)".
     // But props data is likely chronologically sorted for charts.
     // We should clone and sort for table.
@@ -41,7 +42,18 @@ export default function PerformanceTable({ data }: PerformanceTableProps) {
                     {sortedData.map((row, idx) => (
                         <tr key={idx}>
                             <td>{new Date(row.date).toLocaleDateString()}</td>
-                            <td style={{ fontWeight: 500, color: '#1a365d' }}>{row.topic}</td>
+                            <td 
+                                style={{ 
+                                    fontWeight: 500, 
+                                    color: onTopicClick ? '#7c3aed' : '#1a365d',
+                                    cursor: onTopicClick ? 'pointer' : 'default',
+                                    textDecoration: onTopicClick ? 'underline' : 'none'
+                                }}
+                                onClick={() => onTopicClick?.(row.topic)}
+                                title={onTopicClick ? "View Subject Analysis for this Topic" : undefined}
+                            >
+                                {row.topic}
+                            </td>
                             <td>
                                 {row.marks === null ? <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Absent</span> : row.marks}
                                 <span style={{ color: '#94a3b8', fontSize: '0.8em' }}> / {row.totalMarks}</span>
