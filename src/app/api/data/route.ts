@@ -1,8 +1,22 @@
-
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getAllData, getStudentData } from "@/lib/parser";
+import { getAllData, getStudentData, getUsers } from "@/lib/parser";
+
+/**
+ * Maps a raw Excel class value (e.g. "12+", 12, "XII") to a folder-style name (e.g. "Class_12+", "Class_XII").
+ */
+function excelClassToFolderName(rawClass: any): string {
+    const val = String(rawClass).trim();
+    const numToRoman: Record<string, string> = {
+        '8': 'VIII', '9': 'IX', '10': 'X', '11': 'XI', '12': 'XII',
+    };
+    // If it's a pure number (no special chars like +), convert to Roman numeral
+    if (/^\d+$/.test(val) && numToRoman[val]) {
+        return `Class_${numToRoman[val]}`;
+    }
+    return `Class_${val}`;
+}
 
 export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
@@ -24,10 +38,18 @@ export async function GET(request: Request) {
     try {
         // 1. Get Class List
         if (type === 'classes') {
-            // Should filter based on role? For now return all configured classes found in Data
             const allData = getAllData();
-            const classes = Object.keys(allData);
-            return NextResponse.json(classes);
+            const folderClasses = Object.keys(allData);
+
+            // Also derive classes from LoginData.xlsx
+            const users = getUsers();
+            const loginClasses = [...new Set(
+                users.filter(u => u.class).map(u => excelClassToFolderName(u.class))
+            )];
+
+            // Merge both sources, deduplicate
+            const merged = [...new Set([...folderClasses, ...loginClasses])];
+            return NextResponse.json(merged);
         }
 
         // 2. Get Subjects for a Class

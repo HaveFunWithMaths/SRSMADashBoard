@@ -35,4 +35,5 @@ export interface User {
     username: string;
     password?: string; // Only used internally during auth
     role: 'student' | 'teacher' | 'admin';
+    class?: string;
 }

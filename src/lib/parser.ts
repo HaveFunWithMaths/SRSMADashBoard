@@ -25,9 +25,10 @@ export function getUsers(): User[] {
     return jsonData.map(row => ({
         username: String(row.username || row.Username || '').trim(), // Handle loose casing
         password: String(row.password || row.Password || '').trim(),
+        class: row.class ? String(row.class).trim() : undefined,
         role: (() => {
             const r = (row.role || row.Role || '').trim().toLowerCase();
-            if (r) return r as 'student' | 'teacher' | 'admin';
+            if (r === 'student' || r === 'teacher' || r === 'admin') return r as 'student' | 'teacher' | 'admin';
 
             // Heuristic fallback
             const u = String(row.username || row.Username || '').toLowerCase();

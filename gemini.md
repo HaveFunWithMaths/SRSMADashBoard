@@ -18,10 +18,10 @@
 | 3+ | Student name (string) | Marks (int) or `"AB"` | Comments (string\|null) | *(empty)* |
 
 **LoginData.xlsx (Sheet1):**
-| Col A | Col B |
-|-------|-------|
-| `"username"` | `"password"` |
-| Student name | Password string |
+| Col A | Col B | Col C | Col D |
+|-------|-------|-------|-------|
+| `"username"` | `"password"` | `"class"` | `"Role"` |
+| Student name | Password string | Class string | 'Student' or 'Teacher' |
 
 ### Output: Processed JSON Schema
 
