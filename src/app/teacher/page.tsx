@@ -44,7 +44,7 @@ export default function TeacherDashboard() {
                 if (Array.isArray(data)) {
                     setClasses(data);
                     if (data.length > 0) {
-                        const defaultClass = data.find(c => c === 'Class_XII') || data[0];
+                        const defaultClass = data.find(c => c === 'Class_12+') || data[0];
                         setSelectedClass(defaultClass);
                     }
                 }
@@ -53,7 +53,7 @@ export default function TeacherDashboard() {
 
     useEffect(() => {
         if (!selectedClass) return;
-        fetch(`/api/data?type=subjects&class=${selectedClass}`)
+        fetch(`/api/data?type=subjects&class=${encodeURIComponent(selectedClass)}`)
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
@@ -68,7 +68,7 @@ export default function TeacherDashboard() {
     useEffect(() => {
         if (!selectedClass || !selectedSubject) return;
         setLoading(true);
-        fetch(`/api/data?type=batch&class=${selectedClass}&subject=${selectedSubject}`)
+        fetch(`/api/data?type=batch&class=${encodeURIComponent(selectedClass)}&subject=${encodeURIComponent(selectedSubject)}`)
             .then(res => res.json())
             .then(data => {
                 let currentTopics: any[] = [];

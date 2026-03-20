@@ -82,69 +82,63 @@ function parseMarks(cellValue: any): number | null {
 }
 
 /**
- * Parses a single Excel file mainly for one Subject.
+ * Parses a single Excel file mainly for one Topic.
  */
-export function parseExcelFile(filePath: string, className: string, subjectName: string): SubjectData {
+export function parseTopicExcelFile(filePath: string, fallbackTopicName: string): TopicData | null {
     const buffer = fs.readFileSync(filePath);
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
 
-    const topics: TopicData[] = [];
+    if (workbook.SheetNames.length === 0) return null;
 
-    workbook.SheetNames.forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        // Convert to JSON array of arrays (header: 1 means array of arrays)
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+    // We assume the first sheet contains the topic data
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    // Convert to JSON array of arrays (header: 1 means array of arrays)
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
 
-        if (jsonData.length < 3) return; // Skip if not enough rows
+    if (jsonData.length < 3) return null; // Skip if not enough rows
 
-        // Validate Header Row 1 (Index 0)
-        // A1=Date, C1=Total Marks
-        const row1 = jsonData[0];
-        if (row1[0] !== 'Date' || row1[2] !== 'Total Marks') {
-            console.warn(`Skipping sheet ${sheetName}: Invalid header Row 1`);
-            return;
-        }
+    // Validate Header Row 1 (Index 0)
+    // A1=Date, C1=Total Marks
+    const row1 = jsonData[0];
+    if (row1[0] !== 'Date' || row1[2] !== 'Total Marks') {
+        console.warn(`Skipping file ${filePath}: Invalid header Row 1`);
+        return null;
+    }
 
-        // Extract Metadata
-        const dateStr = parseDate(row1[1]);
-        const totalMarks = typeof row1[3] === 'number' ? row1[3] : Number(row1[3]) || 0;
+    // Extract Metadata
+    const dateStr = parseDate(row1[1]);
+    const totalMarks = typeof row1[3] === 'number' ? row1[3] : Number(row1[3]) || 0;
 
-        // Row 2 is column names, we verify structure but trust index 0=Name, 1=Marks
+    // Row 2 is column names, we verify structure but trust index 0=Name, 1=Marks
 
-        const students: StudentRecord[] = [];
+    const students: StudentRecord[] = [];
 
-        // Iterate from Row 3 (Index 2)
-        for (let i = 2; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            if (!row || row.length === 0 || !row[0]) continue; // Skip empty rows or missing name
+    // Iterate from Row 3 (Index 2)
+    for (let i = 2; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length === 0 || !row[0]) continue; // Skip empty rows or missing name
 
-            const name = String(row[0]).trim();
-            const marks = parseMarks(row[1]); // Index 1 is Marks
-            const comments = row[2] ? String(row[2]).trim() : null; // Index 2 is Comments
+        const name = String(row[0]).trim();
+        const marks = parseMarks(row[1]); // Index 1 is Marks
+        const comments = row[2] ? String(row[2]).trim() : null; // Index 2 is Comments
 
-            students.push({
-                name,
-                marks,
-                comments
-            });
-        }
+        students.push({
+            name,
+            marks,
+            comments
+        });
+    }
 
-        const rawTopic: TopicData = {
-            topicName: sheetName,
-            date: dateStr,
-            totalMarks,
-            students
-        };
-
-        // Enrich with calculated metrics
-        topics.push(processTopic(rawTopic));
-    });
-
-    return {
-        subjectName,
-        className,
-        topics
+    const rawTopic: TopicData = {
+        topicName: sheetName || fallbackTopicName,
+        date: dateStr,
+        totalMarks,
+        students
     };
+
+    // Enrich with calculated metrics
+    return processTopic(rawTopic);
 }
 
 /**
@@ -162,20 +156,39 @@ export function getAllData(): Record<string, SubjectData[]> {
         const stats = fs.statSync(itemPath);
 
         if (stats.isDirectory()) {
-            // It's a Class folder (e.g. Class_XI)
+            // It's a Class folder (e.g. Class_12+)
             const className = item;
-            const classFiles = fs.readdirSync(itemPath);
+            const classItems = fs.readdirSync(itemPath);
             const classSubjects: SubjectData[] = [];
 
-            for (const file of classFiles) {
-                if (file.endsWith('.xlsx') && !file.startsWith('~$')) {
-                    const subjectName = path.parse(file).name;
-                    try {
-                        const subjectData = parseExcelFile(path.join(itemPath, file), className, subjectName);
-                        classSubjects.push(subjectData);
-                    } catch (e) {
-                        console.error(`Error parsing ${file}:`, e);
+            for (const subjectFolder of classItems) {
+                const subjectFolderPath = path.join(itemPath, subjectFolder);
+                const subjectStats = fs.statSync(subjectFolderPath);
+
+                if (subjectStats.isDirectory()) {
+                    const subjectName = subjectFolder;
+                    const topicFiles = fs.readdirSync(subjectFolderPath);
+                    const topics: TopicData[] = [];
+
+                    for (const topicFile of topicFiles) {
+                        if (topicFile.endsWith('.xlsx') && !topicFile.startsWith('~$')) {
+                            const fallbackTopicName = path.parse(topicFile).name;
+                            try {
+                                const topicData = parseTopicExcelFile(path.join(subjectFolderPath, topicFile), fallbackTopicName);
+                                if (topicData) {
+                                    topics.push(topicData);
+                                }
+                            } catch (e) {
+                                console.error(`Error parsing ${topicFile}:`, e);
+                            }
+                        }
                     }
+
+                    classSubjects.push({
+                        subjectName,
+                        className,
+                        topics
+                    });
                 }
             }
             result[className] = classSubjects;

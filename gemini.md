@@ -8,9 +8,9 @@
 
 ### Input: Excel File Schema
 
-**Folder Hierarchy:** `Data/ → {ClassName}/ → {Subject}.xlsx`
+**Folder Hierarchy:** `Data/ → {ClassName}/ → {Subject}/ → {Topic}.xlsx`
 
-**Each Tab (= one Topic):**
+**Each File (= one Topic), First Tab read:**
 | Row | Col A | Col B | Col C | Col D |
 |-----|-------|-------|-------|-------|
 | 1 | `"Date"` | Date value (datetime) | `"Total Marks"` | Integer (e.g. 60) |

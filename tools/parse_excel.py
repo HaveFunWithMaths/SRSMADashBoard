@@ -87,39 +87,42 @@ def main():
     all_data = {}
     
     # Traverse Data directory
-    for root, dirs, files in os.walk(DATA_DIR):
-        for file in files:
-            if file.endswith('.xlsx') and not file.startswith('LoginData') and not file.startswith('~$'):
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(root, DATA_DIR)
-                subject_name = os.path.splitext(file)[0]
+    for class_name in os.listdir(DATA_DIR):
+        class_path = os.path.join(DATA_DIR, class_name)
+        if not os.path.isdir(class_path) or class_name.startswith('.'):
+            continue
+            
+        all_data[class_name] = {}
+            
+        for subject_name in os.listdir(class_path):
+            subject_path = os.path.join(class_path, subject_name)
+            if not os.path.isdir(subject_path):
+                continue
                 
-                # Assume folder structure Data/{ClassName}/{Subject}.xlsx
-                # rel_path is likely {ClassName}
-                class_name = rel_path
-                
-                print(f"Processing: {class_name} / {subject_name}")
-                
-                try:
-                    wb = openpyxl.load_workbook(full_path, data_only=True)
-                    subject_data = {
-                        'subjectName': subject_name,
-                        'className': class_name,
-                        'topics': []
-                    }
+            subject_data = {
+                'subjectName': subject_name,
+                'className': class_name,
+                'topics': []
+            }
+            
+            for file in os.listdir(subject_path):
+                if file.endswith('.xlsx') and not file.startswith('~$'):
+                    full_path = os.path.join(subject_path, file)
+                    topic_name = os.path.splitext(file)[0]
                     
-                    for sheet_name in wb.sheetnames:
-                        topic = parse_sheet(wb[sheet_name], sheet_name)
-                        if topic:
-                            subject_data['topics'].append(topic)
-                            
-                    # Store in structure
-                    if class_name not in all_data:
-                        all_data[class_name] = {}
-                    all_data[class_name][subject_name] = subject_data
+                    print(f"Processing: {class_name} / {subject_name} / {topic_name}")
                     
-                except Exception as e:
-                    print(f"  [ERROR] Failed to read {file}: {e}")
+                    try:
+                        wb = openpyxl.load_workbook(full_path, data_only=True)
+                        if wb.sheetnames:
+                            sheet_name = wb.sheetnames[0]
+                            topic = parse_sheet(wb[sheet_name], sheet_name or topic_name)
+                            if topic:
+                                subject_data['topics'].append(topic)
+                    except Exception as e:
+                        print(f"  [ERROR] Failed to read {file}: {e}")
+                        
+            all_data[class_name][subject_name] = subject_data
 
     # Output results
     with open(OUTPUT_FILE, 'w') as f:

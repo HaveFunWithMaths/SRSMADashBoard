@@ -50,7 +50,7 @@ function DashboardContent() {
                 studentToFetch = studentParam;
             }
 
-            const res = await fetch(`/api/data?type=performance&student=${studentToFetch}`);
+            const res = await fetch(`/api/data?type=performance&student=${encodeURIComponent(studentToFetch || '')}`);
             if (!res.ok) throw new Error('Failed to fetch data');
             const jsonData = await res.json();
 
