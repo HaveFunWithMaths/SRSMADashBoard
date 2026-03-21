@@ -30,11 +30,23 @@ export default function TeacherDashboard() {
     const [topicDetails, setTopicDetails] = useState<any>(null);
     const [students, setStudents] = useState<any[]>([]);
     const [selectedStudent, setSelectedStudent] = useState('');
-    const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage'>('analysis');
+    const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload'>('analysis');
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
 
     const [newStudentName, setNewStudentName] = useState('');
     const [isAddingStudent, setIsAddingStudent] = useState(false);
+
+    // Upload Tab State
+    const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
+    const [uploadTopicName, setUploadTopicName] = useState('');
+    const [uploadTotalMarks, setUploadTotalMarks] = useState('');
+    const [uploadStudents, setUploadStudents] = useState<any[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+
+    // Cutoff State
+    const [showCutoffModal, setShowCutoffModal] = useState(false);
+    const [customHighCutoff, setCustomHighCutoff] = useState<number | null>(null);
+    const [customLowCutoff, setCustomLowCutoff] = useState<number | null>(null);
 
     useEffect(() => {
         if (status === 'unauthenticated') router.push('/login');
@@ -119,14 +131,31 @@ export default function TeacherDashboard() {
         } else {
             setTopicDetails(null);
         }
+        // Reset custom cutoffs when topic changes
+        setCustomHighCutoff(null);
+        setCustomLowCutoff(null);
     }, [selectedTopic, batchData]);
+
+    useEffect(() => {
+        setCustomHighCutoff(null);
+        setCustomLowCutoff(null);
+    }, [activeTab]);
 
     useEffect(() => {
         if (selectedClass) {
             fetch(`/api/admin/students?class=${encodeURIComponent(selectedClass)}`)
                 .then(res => res.json())
                 .then(data => {
-                    if (Array.isArray(data)) setStudents(data.sort((a,b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username))));
+                    if (Array.isArray(data)) {
+                        const sortedStudents = data.sort((a,b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username)));
+                        setStudents(sortedStudents);
+                        
+                        // Initialize upload students array
+                        const newUploadStudents = sortedStudents
+                            .filter(s => s.status !== 'Deleted')
+                            .map(s => ({ name: s.username, marks: '', comments: '' }));
+                        setUploadStudents(newUploadStudents);
+                    }
                 })
                 .catch(console.error);
         }
@@ -203,6 +232,72 @@ export default function TeacherDashboard() {
         }
     };
 
+    const handleUploadMarks = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedClass || !selectedSubject || !uploadTopicName || !uploadTotalMarks) return;
+        
+        setIsUploading(true);
+        try {
+            const payload = {
+                className: selectedClass,
+                subject: selectedSubject,
+                topicName: uploadTopicName,
+                date: uploadDate,
+                totalMarks: Number(uploadTotalMarks),
+                students: uploadStudents
+            };
+
+            const res = await fetch('/api/data/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                alert('Marks uploaded successfully!');
+                setUploadTopicName('');
+                setUploadTotalMarks('');
+                setUploadStudents(prev => prev.map(s => ({ ...s, marks: '', comments: '' })));
+                // Trigger refresh if needed
+                fetch(`/api/data?type=batch&class=${encodeURIComponent(selectedClass)}&subject=${encodeURIComponent(selectedSubject)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (Array.isArray(data) && data.length > 0) setBatchData(data[0].topics || []);
+                    });
+            } else {
+                alert(result.error || 'Failed to upload marks');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error uploading marks');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Calculate dynamic cutoffs based on marks array
+    const calculateCutoffs = (marksArray: (number | null)[]) => {
+        const validMarks = marksArray.filter((m): m is number => m !== null && typeof m === 'number');
+        if (validMarks.length === 0) return { mean: 0, sd: 0, high: 0, low: 0 };
+        const mean = validMarks.reduce((a, b) => a + b, 0) / validMarks.length;
+        const variance = validMarks.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / validMarks.length;
+        const sd = Math.sqrt(variance);
+        return { 
+            mean, 
+            sd, 
+            high: customHighCutoff !== null ? customHighCutoff : mean + sd, 
+            low: customLowCutoff !== null ? customLowCutoff : mean - sd 
+        };
+    };
+
+    const getColorForMark = (mark: number | null, highCutoff: number, lowCutoff: number) => {
+        if (mark === null) return { bg: '#fee2e2', text: '#991b1b' }; // Default for absent? Actually absent is '-'
+        if (mark > highCutoff) return { bg: '#dcfce7', text: '#166534' }; // Green
+        if (mark < lowCutoff) return { bg: '#fee2e2', text: '#991b1b' }; // Red
+        return { bg: '#fef9c3', text: '#854d0e' }; // Yellow
+    };
+
     if (status === 'loading') return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b' }}>Loading...</div>;
     if (!session) return null;
 
@@ -227,6 +322,12 @@ export default function TeacherDashboard() {
         : 0;
 
     const subjectColor = SUBJECT_COLORS[selectedSubject] || SUBJECT_COLORS['default'];
+
+    const tableMarksArray = tableData.map((s: any) => s.marks);
+    const { mean, sd, high: highCutoff, low: lowCutoff } = calculateCutoffs(tableMarksArray);
+
+    const uploadMarksArray = uploadStudents.filter(s => s.marks !== '').map(s => Number(s.marks)).filter(m => !isNaN(m));
+    const { high: uploadHighCutoff, low: uploadLowCutoff } = calculateCutoffs(uploadMarksArray);
 
     return (
         <>
@@ -281,7 +382,7 @@ export default function TeacherDashboard() {
                     >
                         Student Dashboard
                     </button>
-                    <button
+                        <button
                         onClick={() => setActiveTab('manage')}
                         style={{
                             padding: '0.75rem 1.5rem',
@@ -300,6 +401,26 @@ export default function TeacherDashboard() {
                         }}
                     >
                         Class Manager
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('upload')}
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            borderTop: 'none',
+                            borderLeft: 'none',
+                            borderRight: 'none',
+                            borderBottom: activeTab === 'upload' ? '2px solid #7c3aed' : '2px solid transparent',
+                            color: activeTab === 'upload' ? '#7c3aed' : '#64748b',
+                            fontWeight: activeTab === 'upload' ? 600 : 500,
+                            fontSize: '0.95rem',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            marginLeft: '1rem',
+                            outline: 'none'
+                        }}
+                    >
+                        Upload Marks
                     </button>
                 </div>
 
@@ -530,8 +651,57 @@ export default function TeacherDashboard() {
                                                 <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Total Marks</span>
                                                 <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{topicDetails.totalMarks}</span>
                                             </div>
+                                            <button
+                                                onClick={() => {
+                                                    setCustomHighCutoff(highCutoff !== null ? Number(highCutoff.toFixed(2)) : null);
+                                                    setCustomLowCutoff(lowCutoff !== null ? Number(lowCutoff.toFixed(2)) : null);
+                                                    setShowCutoffModal(!showCutoffModal);
+                                                }}
+                                                style={{
+                                                    backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
+                                                    border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
+                                                    borderRadius: '0.5rem', cursor: 'pointer', 
+                                                    color: showCutoffModal ? '#fff' : '#475569', 
+                                                    fontSize: '0.85rem', fontWeight: 600,
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
+                                            </button>
                                         </div>
                                     </div>
+
+                                    {showCutoffModal && (
+                                        <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#fcfcfc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#166534' }}>Green (Greater than)</label>
+                                                    <input 
+                                                        type="number" step="0.01" value={customHighCutoff ?? Number(highCutoff.toFixed(2))}
+                                                        onChange={e => setCustomHighCutoff(e.target.value ? Number(e.target.value) : null)}
+                                                        style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
+                                                    />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#991b1b' }}>Red (Less than)</label>
+                                                    <input 
+                                                        type="number" step="0.01" value={customLowCutoff ?? Number(lowCutoff.toFixed(2))}
+                                                        onChange={e => setCustomLowCutoff(e.target.value ? Number(e.target.value) : null)}
+                                                        style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button 
+                                                    onClick={() => { setCustomHighCutoff(null); setCustomLowCutoff(null); }}
+                                                    style={{ padding: '0.4rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.25rem', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.85rem' }}
+                                                >
+                                                    Reset
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                             <thead>
@@ -562,14 +732,16 @@ export default function TeacherDashboard() {
                                                             {student.marks ?? '-'} <span style={{ fontSize: '0.8em', opacity: 0.7 }}>/ {student.totalMarks}</span>
                                                         </td>
                                                         <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                                                            <span style={{
-                                                                display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: '1rem',
-                                                                backgroundColor: student.percentage >= 85 ? '#dcfce7' : student.percentage >= 60 ? '#fef9c3' : '#fee2e2',
-                                                                color: student.percentage >= 85 ? '#166534' : student.percentage >= 60 ? '#854d0e' : '#991b1b',
-                                                                fontWeight: 600, fontSize: '0.8rem'
-                                                            }}>
-                                                                {student.percentage ? `${student.percentage}%` : '-'}
-                                                            </span>
+                                                            {student.marks !== null ? (
+                                                                <span style={{
+                                                                    display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: '1rem',
+                                                                    backgroundColor: getColorForMark(student.marks, highCutoff, lowCutoff).bg,
+                                                                    color: getColorForMark(student.marks, highCutoff, lowCutoff).text,
+                                                                    fontWeight: 600, fontSize: '0.8rem'
+                                                                }}>
+                                                                    {student.percentage ? `${student.percentage}%` : '-'}
+                                                                </span>
+                                                            ) : '-'}
                                                         </td>
                                                         <td style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.85rem' }}>{student.comments || '-'}</td>
                                                     </tr>
@@ -731,6 +903,184 @@ export default function TeacherDashboard() {
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {activeTab === 'upload' && (
+                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3 className="card-title" style={{ margin: 0 }}>Upload Marks: {selectedClass.replace('_', ' ')} - {selectedSubject}</h3>
+                            <button
+                                onClick={() => {
+                                    setCustomHighCutoff(uploadHighCutoff !== null ? Number(uploadHighCutoff.toFixed(2)) : null);
+                                    setCustomLowCutoff(uploadLowCutoff !== null ? Number(uploadLowCutoff.toFixed(2)) : null);
+                                    setShowCutoffModal(!showCutoffModal);
+                                    
+                                    // Sort Table by Marks descending
+                                    if (!showCutoffModal) {
+                                        setUploadStudents(prev => [...prev].sort((a,b) => {
+                                            const m1 = Number(a.marks);
+                                            const m2 = Number(b.marks);
+                                            if ((isNaN(m1) || a.marks === '') && (isNaN(m2) || b.marks === '')) return 0;
+                                            if (isNaN(m1) || a.marks === '') return 1;
+                                            if (isNaN(m2) || b.marks === '') return -1;
+                                            return m2 - m1;
+                                        }));
+                                    }
+                                }}
+                                style={{
+                                    backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
+                                    border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
+                                    borderRadius: '0.5rem', cursor: 'pointer', 
+                                    color: showCutoffModal ? '#fff' : '#475569', 
+                                    fontSize: '0.85rem', fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
+                            </button>
+                        </div>
+
+                        {showCutoffModal && (
+                            <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#fcfcfc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', marginBottom: '1.5rem', display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#166534' }}>Green (Greater than)</label>
+                                        <input 
+                                            type="number" step="0.01" value={customHighCutoff ?? Number(uploadHighCutoff.toFixed(2))}
+                                            onChange={e => setCustomHighCutoff(e.target.value ? Number(e.target.value) : null)}
+                                            style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#991b1b' }}>Red (Less than)</label>
+                                        <input 
+                                            type="number" step="0.01" value={customLowCutoff ?? Number(uploadLowCutoff.toFixed(2))}
+                                            onChange={e => setCustomLowCutoff(e.target.value ? Number(e.target.value) : null)}
+                                            style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <button 
+                                        onClick={() => { setCustomHighCutoff(null); setCustomLowCutoff(null); }}
+                                        style={{ padding: '0.4rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.25rem', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.85rem' }}
+                                    >
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <form onSubmit={handleUploadMarks}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Topic Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={uploadTopicName} 
+                                        onChange={e => setUploadTopicName(e.target.value)}
+                                        placeholder="e.g. Chapter 1 Test"
+                                        required
+                                        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={uploadDate} 
+                                        onChange={e => setUploadDate(e.target.value)}
+                                        required
+                                        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Total Marks</label>
+                                    <input 
+                                        type="number" 
+                                        min="0.1"
+                                        step="0.1"
+                                        value={uploadTotalMarks} 
+                                        onChange={e => setUploadTotalMarks(e.target.value)}
+                                        required
+                                        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ overflowX: 'auto', marginBottom: '2rem' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', backgroundColor: '#f8fafc' }}>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Student Name</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Marks (Leave blank if AB)</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Remarks (Optional)</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'center' }}>Color Preview</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {uploadStudents.map((student, idx) => (
+                                            <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                <td style={{ padding: '0.75rem', fontWeight: 500, color: '#334155' }}>
+                                                    {student.name}
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <input 
+                                                        type="number" 
+                                                        step="0.1"
+                                                        value={student.marks}
+                                                        onChange={e => {
+                                                            const newStudents = [...uploadStudents];
+                                                            newStudents[idx].marks = e.target.value;
+                                                            setUploadStudents(newStudents);
+                                                        }}
+                                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <input 
+                                                        type="text" 
+                                                        value={student.comments}
+                                                        onChange={e => {
+                                                            const newStudents = [...uploadStudents];
+                                                            newStudents[idx].comments = e.target.value;
+                                                            setUploadStudents(newStudents);
+                                                        }}
+                                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                                    {student.marks !== '' && !isNaN(Number(student.marks)) ? (
+                                                        <span style={{
+                                                            display: 'inline-block', width: '2rem', height: '2rem', borderRadius: '50%',
+                                                            backgroundColor: getColorForMark(Number(student.marks), uploadHighCutoff, uploadLowCutoff).bg,
+                                                            border: `2px solid ${getColorForMark(Number(student.marks), uploadHighCutoff, uploadLowCutoff).text}`
+                                                        }}></span>
+                                                    ) : (
+                                                        <span style={{ color: '#94a3b8' }}>AB</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div style={{ textAlign: 'right' }}>
+                                <button
+                                    type="submit"
+                                    disabled={isUploading}
+                                    style={{
+                                        padding: '0.75rem 2rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '0.5rem',
+                                        fontWeight: 600, cursor: isUploading ? 'not-allowed' : 'pointer', opacity: isUploading ? 0.7 : 1,
+                                        fontSize: '1rem'
+                                    }}
+                                >
+                                    {isUploading ? 'Uploading...' : 'Save Data'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 )}
             </main>

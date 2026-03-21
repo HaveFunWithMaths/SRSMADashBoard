@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getAllData, getStudentData, getUsersFromDB } from "@/lib/parser";
+import { getAllDataFromDB, getStudentDataFromDB, getUsersFromDB } from "@/lib/parser";
 import { getAllClasses } from "@/lib/db";
 
 /**
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     try {
         // 1. Get Class List
         if (type === 'classes') {
-            const allData = getAllData();
+            const allData = await getAllDataFromDB();
             const folderClasses = Object.keys(allData);
 
             // Derive classes from database
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
         // 2. Get Subjects for a Class
         if (type === 'subjects' && className) {
-            const allData = getAllData();
+            const allData = await getAllDataFromDB();
             const subjects = allData[className]?.map(s => s.subjectName) || [];
             return NextResponse.json(subjects);
         }
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
                 return NextResponse.json({ error: 'Forbidden: Access denied to other student data' }, { status: 403 });
             }
 
-            const data = getStudentData(student);
+            const data = await getStudentDataFromDB(student);
             return NextResponse.json(data);
         }
 
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
             // Return full class data structure for the specific class/subject
             if (!className) return NextResponse.json({ error: 'Class required' }, { status: 400 });
 
-            const allData = getAllData();
+            const allData = await getAllDataFromDB();
             let result = allData[className] || [];
 
             if (subject) {

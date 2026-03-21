@@ -41,6 +41,52 @@ export async function initializeDatabase(): Promise<void> {
             UNIQUE(username, class)
         )
     `;
+    await sql`
+        CREATE TABLE IF NOT EXISTS performance_marks (
+            id SERIAL PRIMARY KEY,
+            class_name VARCHAR(50) NOT NULL,
+            subject VARCHAR(100) NOT NULL,
+            topic VARCHAR(255) NOT NULL,
+            test_date TIMESTAMP NOT NULL,
+            total_marks NUMERIC NOT NULL,
+            student_name VARCHAR(255) NOT NULL,
+            marks NUMERIC,
+            comments TEXT,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(class_name, subject, topic, student_name)
+        )
+    `;
+}
+
+// ---------- Performance Queries ----------
+
+export async function savePerformanceData(
+    className: string,
+    subject: string,
+    topicName: string,
+    testDate: string,
+    totalMarks: number,
+    studentName: string,
+    marks: number | null,
+    comments: string | null
+): Promise<void> {
+    const sql = getSQL();
+    await sql`
+        INSERT INTO performance_marks (class_name, subject, topic, test_date, total_marks, student_name, marks, comments)
+        VALUES (${className}, ${subject}, ${topicName}, ${testDate}, ${totalMarks}, ${studentName}, ${marks}, ${comments})
+        ON CONFLICT (class_name, subject, topic, student_name)
+        DO UPDATE SET 
+            marks = EXCLUDED.marks,
+            comments = EXCLUDED.comments,
+            test_date = EXCLUDED.test_date,
+            total_marks = EXCLUDED.total_marks
+    `;
+}
+
+export async function getPerformanceDataFromDB(): Promise<any[]> {
+    const sql = getSQL();
+    const rows = await sql`SELECT * FROM performance_marks ORDER BY test_date ASC`;
+    return rows;
 }
 
 // ---------- Queries ----------

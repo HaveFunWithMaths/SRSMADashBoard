@@ -4,7 +4,7 @@ import fs from 'fs';
 import * as XLSX from 'xlsx';
 import { SubjectData, TopicData, StudentRecord, User } from './types';
 import { processTopic } from './engine';
-import { getAllUsers } from './db';
+import { getAllUsers, getPerformanceDataFromDB } from './db';
 
 // Define base Data directory
 const DATA_DIR = path.join(process.cwd(), 'Data');
@@ -255,6 +255,7 @@ export function getStudentData(studentName: string) {
                         date: topic.date,
                         totalMarks: topic.totalMarks,
                         classAverage: topic.classAverage,
+                        standardDeviation: topic.standardDeviation,
                         topperMarks: topic.topperMarks,
                         classAveragePercentage: topic.classAveragePercentage,
                         topperPercentage: topic.topperPercentage
@@ -265,6 +266,94 @@ export function getStudentData(studentName: string) {
     });
 
     // Sort by date
+    studentPerformance.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return studentPerformance;
+}
+
+/**
+ * DB based methods for production replacing synchronous file system reads.
+ */
+export async function getAllDataFromDB(): Promise<Record<string, SubjectData[]>> {
+    try {
+        const rows = await getPerformanceDataFromDB();
+        const result: Record<string, SubjectData[]> = {};
+
+        const topicMap = new Map<string, TopicData>();
+
+        for (const row of rows) {
+            const className = row.class_name;
+            const subject = row.subject;
+            const topicName = row.topic;
+            const totalMarks = Number(row.total_marks);
+            const testDate = row.test_date instanceof Date ? row.test_date.toISOString() : new Date(row.test_date).toISOString();
+            
+            const topicKey = `${className}|${subject}|${topicName}`;
+            
+            if (!topicMap.has(topicKey)) {
+                topicMap.set(topicKey, {
+                    topicName,
+                    date: testDate,
+                    totalMarks,
+                    students: []
+                });
+            }
+            
+            const topic = topicMap.get(topicKey)!;
+            topic.students.push({
+                name: row.student_name,
+                marks: row.marks !== null ? Number(row.marks) : null,
+                comments: row.comments
+            });
+        }
+
+        for (const [key, rawTopic] of topicMap.entries()) {
+            const [className, subjectName] = key.split('|');
+            
+            if (!result[className]) result[className] = [];
+            
+            let subjectObj = result[className].find(s => s.subjectName === subjectName);
+            if (!subjectObj) {
+                subjectObj = { subjectName, className, topics: [] };
+                result[className].push(subjectObj);
+            }
+            
+            subjectObj.topics.push(processTopic(rawTopic));
+        }
+
+        return result;
+    } catch (error) {
+        console.error('Error fetching data from DB, falling back to FS:', error);
+        return getAllData();
+    }
+}
+
+export async function getStudentDataFromDB(studentName: string) {
+    const allData = await getAllDataFromDB();
+    const studentPerformance: any[] = [];
+
+    Object.values(allData).forEach(subjects => {
+        subjects.forEach(subject => {
+            subject.topics.forEach(topic => {
+                const studentRecord = topic.students.find(s => s.name === studentName);
+                if (studentRecord) {
+                    studentPerformance.push({
+                        ...studentRecord,
+                        subject: subject.subjectName,
+                        topic: topic.topicName,
+                        date: topic.date,
+                        totalMarks: topic.totalMarks,
+                        classAverage: topic.classAverage,
+                        standardDeviation: topic.standardDeviation,
+                        topperMarks: topic.topperMarks,
+                        classAveragePercentage: topic.classAveragePercentage,
+                        topperPercentage: topic.topperPercentage
+                    });
+                }
+            });
+        });
+    });
+
     studentPerformance.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return studentPerformance;

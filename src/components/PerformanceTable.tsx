@@ -16,11 +16,15 @@ export default function PerformanceTable({ data, onTopicClick }: PerformanceTabl
         return b.marks - a.marks;
     });
 
-    const getHeatmapClass = (percentage: number | null) => {
-        if (percentage === null) return '';
-        if (percentage >= 85) return 'heatmap-high';
-        if (percentage >= 60) return 'heatmap-mid';
-        return 'heatmap-low';
+    const getHeatmapClass = (row: any) => {
+        if (row.marks === null || row.classAverage === undefined || row.standardDeviation === undefined) {
+            return '';
+        }
+        const mean = row.classAverage;
+        const sd = row.standardDeviation;
+        if (row.marks > mean + sd) return 'heatmap-high';
+        if (row.marks < mean - sd) return 'heatmap-low';
+        return 'heatmap-mid';
     };
 
     return (
@@ -58,7 +62,7 @@ export default function PerformanceTable({ data, onTopicClick }: PerformanceTabl
                                 {row.marks === null ? <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Absent</span> : row.marks}
                                 <span style={{ color: '#94a3b8', fontSize: '0.8em' }}> / {row.totalMarks}</span>
                             </td>
-                            <td className={getHeatmapClass(row.percentage)}>
+                            <td className={getHeatmapClass(row)}>
                                 {row.percentage === null ? '-' : `${row.percentage}%`}
                             </td>
                             <td>{row.rank === null ? '-' : `#${row.rank}`}</td>

@@ -79,6 +79,20 @@ export function getTopperMarks(students: StudentRecord[]): number {
 }
 
 /**
+ * Calculates standard deviation for a list of valid marks.
+ */
+export function calculateStandardDeviation(students: StudentRecord[], mean: number): number {
+    const validMarks = students
+        .map(s => s.marks)
+        .filter((m): m is number => m !== null);
+
+    if (validMarks.length === 0) return 0;
+    
+    const variance = validMarks.reduce((a, b) => a + Math.pow(b - Math.round(mean), 2), 0) / validMarks.length;
+    return Math.round(Math.sqrt(variance) * 10) / 10;
+}
+
+/**
  * Enriches a topic with calculated metrics.
  */
 export function processTopic(topic: TopicData): TopicData {
@@ -90,12 +104,14 @@ export function processTopic(topic: TopicData): TopicData {
     const rankedStudents = calculateRanks(enrichedStudents);
 
     const classAverage = calculateClassAverage(enrichedStudents);
+    const standardDeviation = calculateStandardDeviation(enrichedStudents, classAverage);
     const topperMarks = getTopperMarks(enrichedStudents);
 
     return {
         ...topic,
         students: rankedStudents,
         classAverage,
+        standardDeviation,
         topperMarks,
         classAveragePercentage: calculatePercentage(classAverage, topic.totalMarks) ?? 0,
         topperPercentage: calculatePercentage(topperMarks, topic.totalMarks) ?? 0

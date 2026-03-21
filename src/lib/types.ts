@@ -18,6 +18,7 @@ export interface TopicData {
     topperMarks?: number;
     classAveragePercentage?: number;
     topperPercentage?: number;
+    standardDeviation?: number;
 }
 
 export interface SubjectData {
