@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getAllData, getStudentData, getUsers } from "@/lib/parser";
+import { getAllData, getStudentData, getUsersFromDB } from "@/lib/parser";
+import { getAllClasses } from "@/lib/db";
 
 /**
  * Maps a raw Excel class value (e.g. "12+", 12, "XII") to a folder-style name (e.g. "Class_12+", "Class_XII").
@@ -34,11 +35,17 @@ export async function GET(request: Request) {
             const allData = getAllData();
             const folderClasses = Object.keys(allData);
 
-            // Also derive classes from LoginData.xlsx
-            const users = getUsers();
-            const loginClasses = [...new Set(
-                users.filter(u => u.class).map(u => excelClassToFolderName(u.class))
-            )];
+            // Derive classes from database
+            let loginClasses: string[] = [];
+            try {
+                loginClasses = await getAllClasses();
+            } catch (err) {
+                console.error('DB class lookup failed, falling back to Excel:', err);
+                const users = await getUsersFromDB();
+                loginClasses = [...new Set(
+                    users.filter(u => u.class).map(u => excelClassToFolderName(u.class))
+                )];
+            }
 
             // Merge both sources, deduplicate
             const merged = [...new Set([...folderClasses, ...loginClasses])];

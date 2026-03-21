@@ -1,7 +1,7 @@
 
 import NextAuth, { NextAuthOptions, User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { getUsers } from "./parser";
+import { getUsersFromDB } from "./parser";
 import { compare } from "bcryptjs";
 
 // Extend built-in types
@@ -40,8 +40,8 @@ export const authOptions: NextAuthOptions = {
             async authorize(credentials) {
                 if (!credentials?.username || !credentials?.password) return null;
 
-                const users = getUsers();
-                const user = users.find(u => u.username.toLowerCase() === credentials.username.toLowerCase());
+                const users = await getUsersFromDB();
+                const user = users.find((u: { username: string }) => u.username.toLowerCase() === credentials.username.toLowerCase());
 
                 if (!user || !user.password) return null;
 

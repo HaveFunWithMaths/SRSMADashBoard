@@ -4,12 +4,50 @@ import fs from 'fs';
 import * as XLSX from 'xlsx';
 import { SubjectData, TopicData, StudentRecord, User } from './types';
 import { processTopic } from './engine';
+import { getAllUsers } from './db';
 
 // Define base Data directory
 const DATA_DIR = path.join(process.cwd(), 'Data');
 
 /**
- * Reads users from LoginData.xlsx
+ * Maps a DB row to the User type used by auth and the rest of the app.
+ */
+function mapRowToUser(row: any): User {
+    const role = String(row.role || row.Role || '').trim().toLowerCase();
+    let mappedRole: 'student' | 'teacher' | 'admin' = 'student';
+    if (role === 'student' || role === 'teacher' || role === 'admin') {
+        mappedRole = role;
+    } else {
+        // Heuristic fallback
+        const u = String(row.username || '').toLowerCase();
+        if (u === 'srsma') mappedRole = 'teacher';
+        else if (u.includes('admin')) mappedRole = 'admin';
+        else if (u.includes('teacher')) mappedRole = 'teacher';
+    }
+
+    return {
+        username: String(row.username || '').trim(),
+        password: String(row.password || '').trim(),
+        class: row.class ? String(row.class).trim() : undefined,
+        role: mappedRole
+    };
+}
+
+/**
+ * Reads users from the PostgreSQL database (primary, for production).
+ */
+export async function getUsersFromDB(): Promise<User[]> {
+    try {
+        const rows = await getAllUsers();
+        return rows.map(mapRowToUser).filter(u => u.username && u.password);
+    } catch (err) {
+        console.error('DB getUsersFromDB failed, falling back to Excel:', err);
+        return getUsers();
+    }
+}
+
+/**
+ * Reads users from LoginData.xlsx (synchronous fallback for local dev).
  */
 export function getUsers(): User[] {
     const loginFile = path.join(DATA_DIR, 'LoginData.xlsx');
@@ -19,18 +57,16 @@ export function getUsers(): User[] {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    // Header: A1=username, B1=password
     const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
 
     return jsonData.map(row => ({
-        username: String(row.username || row.Username || '').trim(), // Handle loose casing
+        username: String(row.username || row.Username || '').trim(),
         password: String(row.password || row.Password || '').trim(),
         class: row.class ? String(row.class).trim() : undefined,
         role: (() => {
             const r = (row.role || row.Role || '').trim().toLowerCase();
             if (r === 'student' || r === 'teacher' || r === 'admin') return r as 'student' | 'teacher' | 'admin';
 
-            // Heuristic fallback
             const u = String(row.username || row.Username || '').toLowerCase();
             if (u === 'srsma') return 'teacher';
             if (u.includes('admin')) return 'admin';

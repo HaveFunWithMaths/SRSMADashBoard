@@ -49,7 +49,7 @@ export default function AdminDashboard() {
 
                 <div className="card mt-4">
                     <h3 className="card-title">User Management</h3>
-                    <p className="text-sm text-muted">User accounts are managed via <code>LoginData.xlsx</code>. To add users, please update the Excel file.</p>
+                    <p className="text-sm text-muted">User accounts are managed via the database. Teachers can manage students from the Class Manager tab.</p>
                 </div>
             </main>
         </>
