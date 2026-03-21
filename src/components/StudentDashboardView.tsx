@@ -10,9 +10,11 @@ interface StudentDashboardViewProps {
     showBackToTeacher?: boolean;
     onBack?: () => void;
     onTopicClick?: (topic: string, subject: string) => void;
+    externalActiveSubject?: string;
+    onSubjectChange?: (subject: string) => void;
 }
 
-export default function StudentDashboardView({ studentName, showBackToTeacher, onBack, onTopicClick }: StudentDashboardViewProps) {
+export default function StudentDashboardView({ studentName, showBackToTeacher, onBack, onTopicClick, externalActiveSubject, onSubjectChange }: StudentDashboardViewProps) {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<string[]>([]);
@@ -34,10 +36,24 @@ export default function StudentDashboardView({ studentName, showBackToTeacher, o
                 // Extract subjects
                 const dataSubjects = Array.from(new Set(safeData.map((d: any) => d.subject))) as string[];
                 const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
-                const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
+                const allSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
+                
+                // Sort according to preferred order
+                const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
+                const uniqueSubjects = allSubjects.sort((a, b) => {
+                    const idxA = sortOrder.indexOf(a);
+                    const idxB = sortOrder.indexOf(b);
+                    if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                    if (idxA === -1) return 1;
+                    if (idxB === -1) return -1;
+                    return idxA - idxB;
+                });
+                
                 setSubjects(uniqueSubjects);
 
-                if (uniqueSubjects.length > 0) {
+                if (externalActiveSubject && uniqueSubjects.includes(externalActiveSubject)) {
+                    setActiveSubject(externalActiveSubject);
+                } else if (uniqueSubjects.length > 0) {
                     setActiveSubject(uniqueSubjects[0]);
                 }
             })
@@ -45,7 +61,18 @@ export default function StudentDashboardView({ studentName, showBackToTeacher, o
             .finally(() => setLoading(false));
     }, [studentName]);
 
+    useEffect(() => {
+        if (externalActiveSubject && subjects.includes(externalActiveSubject)) {
+            setActiveSubject(externalActiveSubject);
+        }
+    }, [externalActiveSubject, subjects]);
+
     if (loading) return <div className="flex justify-center items-center p-12 text-muted">Loading student data...</div>;
+
+    const handleSubjectClick = (sub: string) => {
+        setActiveSubject(sub);
+        if (onSubjectChange) onSubjectChange(sub);
+    };
 
     const subjectData = data.filter(d => d.subject === activeSubject);
 
@@ -63,7 +90,7 @@ export default function StudentDashboardView({ studentName, showBackToTeacher, o
                         <button
                             key={sub}
                             className={`tab-btn ${activeSubject === sub ? 'active' : ''}`}
-                            onClick={() => setActiveSubject(sub)}
+                            onClick={() => handleSubjectClick(sub)}
                         >
                             {sub}
                         </button>

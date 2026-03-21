@@ -83,8 +83,19 @@ export default function TeacherDashboard() {
                 if (Array.isArray(data)) {
                     const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
                     const merged = Array.from(new Set([...data, ...requiredSubjects]));
-                    setSubjects(merged);
-                    if (merged.length > 0) setSelectedSubject(merged[0]);
+                    
+                    const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
+                    const sortedSubjects = merged.sort((a, b) => {
+                        const idxA = sortOrder.indexOf(a);
+                        const idxB = sortOrder.indexOf(b);
+                        if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                        if (idxA === -1) return 1;
+                        if (idxB === -1) return -1;
+                        return idxA - idxB;
+                    });
+                    
+                    setSubjects(sortedSubjects);
+                    if (sortedSubjects.length > 0) setSelectedSubject(sortedSubjects[0]);
                 }
             });
     }, [selectedClass]);
@@ -550,7 +561,7 @@ export default function TeacherDashboard() {
 
                                 {viewMode === 'table' ? (
                                     <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                        <table className="data-table" style={{ width: '100%' }}>
                                             <thead>
                                                 <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                                                     <th style={{ textAlign: 'left', padding: '0.75rem 1rem', color: '#64748b', fontWeight: 600 }}>Topic</th>
@@ -639,7 +650,10 @@ export default function TeacherDashboard() {
                                                 {selectedTopic}
                                             </h3>
                                             <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                                                {new Date(topicDetails.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                {(() => {
+                                                    const d = new Date(topicDetails.date);
+                                                    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getFullYear()).slice(-2)}`;
+                                                })()}
                                             </p>
                                         </div>
                                         <div style={{ display: 'flex', gap: '2rem' }}>
@@ -703,7 +717,7 @@ export default function TeacherDashboard() {
                                     )}
 
                                     <div>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                        <table className="data-table" style={{ width: '100%' }}>
                                             <thead>
                                                 <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', backgroundColor: '#fff' }}>
                                                     <th style={{ padding: '0.75rem', textAlign: 'center', width: '60px' }}>Rank</th>
@@ -784,6 +798,8 @@ export default function TeacherDashboard() {
                             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
                                 <StudentDashboardView 
                                     studentName={selectedStudent} 
+                                    externalActiveSubject={selectedSubject}
+                                    onSubjectChange={setSelectedSubject}
                                     onTopicClick={(topic, subject) => {
                                         if (subject && subjects.includes(subject)) {
                                             setSelectedSubject(subject);
@@ -838,7 +854,7 @@ export default function TeacherDashboard() {
                             <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', marginBottom: '1rem' }}>Enrolled Students</h4>
                             {students.filter(s => s.status !== 'Deleted').length > 0 ? (
                                 <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left', backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+                                    <table className="data-table" style={{ width: '100%', backgroundColor: '#fff' }}>
                                         <thead>
                                             <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b' }}>
                                                 <th style={{ padding: '0.75rem 1rem' }}>Roll Number</th>
@@ -874,7 +890,7 @@ export default function TeacherDashboard() {
                             <div style={{ marginTop: '2rem' }}>
                                 <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#ef4444', marginBottom: '1rem' }}>Deleted Students</h4>
                                 <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left', backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
+                                    <table className="data-table" style={{ width: '100%', backgroundColor: '#fef2f2' }}>
                                         <thead>
                                             <tr style={{ borderBottom: '2px solid #fca5a5', color: '#b91c1c' }}>
                                                 <th style={{ padding: '0.75rem 1rem' }}>Roll Number</th>
@@ -1010,7 +1026,7 @@ export default function TeacherDashboard() {
                             </div>
 
                             <div style={{ overflowX: 'auto', marginBottom: '2rem' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                <table className="data-table" style={{ width: '100%' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', backgroundColor: '#f8fafc' }}>
                                             <th style={{ padding: '0.75rem', textAlign: 'left' }}>Student Name</th>

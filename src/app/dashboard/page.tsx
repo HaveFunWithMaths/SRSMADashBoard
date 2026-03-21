@@ -60,7 +60,18 @@ function DashboardContent() {
             const dataSubjects = Array.from(new Set(jsonData.map((d: any) => d.subject))) as string[];
             const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
             const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
-            setSubjects(uniqueSubjects);
+            
+            const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const sortedSubjects = uniqueSubjects.sort((a, b) => {
+                const idxA = sortOrder.indexOf(a);
+                const idxB = sortOrder.indexOf(b);
+                if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+            
+            setSubjects(sortedSubjects);
 
             if (uniqueSubjects.length > 0) {
                 setActiveSubject(uniqueSubjects[0]);

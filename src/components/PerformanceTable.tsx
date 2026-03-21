@@ -45,7 +45,12 @@ export default function PerformanceTable({ data, onTopicClick }: PerformanceTabl
                 <tbody>
                     {sortedData.map((row, idx) => (
                         <tr key={idx}>
-                            <td>{new Date(row.date).toLocaleDateString()}</td>
+                            <td>
+                                {(() => {
+                                    const d = new Date(row.date);
+                                    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getFullYear()).slice(-2)}`;
+                                })()}
+                            </td>
                             <td 
                                 style={{ 
                                     fontWeight: 500, 
