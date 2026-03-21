@@ -21,13 +21,16 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
     return (
         <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer>
-                <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
                         dataKey="topic"
-                        tick={{ fontSize: 12, fill: '#64748b' }}
+                        tick={{ fontSize: 11, fill: '#64748b', dy: 10, dx: -5 }}
                         tickLine={false}
                         axisLine={{ stroke: '#cbd5e1' }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
                     />
                     <YAxis
                         domain={[0, 100]}

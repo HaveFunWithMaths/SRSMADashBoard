@@ -98,7 +98,7 @@ function DashboardContent() {
                     </button>
                 )}
 
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-4" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
                         <h2 className="text-xl font-bold text-primary">Student Performance</h2>
                         <p className="text-sm text-muted">Viewing data for: {displayedStudentName}</p>

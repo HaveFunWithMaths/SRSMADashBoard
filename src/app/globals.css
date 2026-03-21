@@ -52,6 +52,7 @@ h6 {
   justify-content: center;
   align-items: center;
   background: linear-gradient(135deg, var(--color-bg) 0%, #e2e8f0 100%);
+  padding: 1rem;
 }
 
 .auth-card {
@@ -62,6 +63,12 @@ h6 {
   width: 100%;
   max-width: 400px;
   text-align: center;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 1.5rem;
+  }
 }
 
 .auth-input {
@@ -296,8 +303,8 @@ h6 {
 
 @media (min-width: 768px) {
   .dashboard-grid {
-    grid-template-columns: 2fr 1fr;
-    /* Graph takes more space */
+    grid-template-columns: 1fr 1fr;
+    /* Both graphs take equal space */
   }
 }
 

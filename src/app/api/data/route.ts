@@ -8,13 +8,6 @@ import { getAllData, getStudentData, getUsers } from "@/lib/parser";
  */
 function excelClassToFolderName(rawClass: any): string {
     const val = String(rawClass).trim();
-    const numToRoman: Record<string, string> = {
-        '8': 'VIII', '9': 'IX', '10': 'X', '11': 'XI', '12': 'XII',
-    };
-    // If it's a pure number (no special chars like +), convert to Roman numeral
-    if (/^\d+$/.test(val) && numToRoman[val]) {
-        return `Class_${numToRoman[val]}`;
-    }
     return `Class_${val}`;
 }
 

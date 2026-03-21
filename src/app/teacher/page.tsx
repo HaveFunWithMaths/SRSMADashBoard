@@ -28,7 +28,7 @@ export default function TeacherDashboard() {
     const [loading, setLoading] = useState(false);
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
     const [topicDetails, setTopicDetails] = useState<any>(null);
-    const [students, setStudents] = useState<string[]>([]);
+    const [students, setStudents] = useState<any[]>([]);
     const [selectedStudent, setSelectedStudent] = useState('');
     const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage'>('analysis');
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
@@ -45,9 +45,18 @@ export default function TeacherDashboard() {
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
-                    setClasses(data);
-                    if (data.length > 0) {
-                        const defaultClass = data.find(c => c === 'Class_12+') || data[0];
+                    const order = ['Class_12+', 'Class_12', 'Class_11', 'Class_10', 'Class_9', 'Class_8'];
+                    const sortedClasses = data.sort((a, b) => {
+                        const idxA = order.indexOf(a);
+                        const idxB = order.indexOf(b);
+                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                        if (idxA !== -1) return -1;
+                        if (idxB !== -1) return 1;
+                        return String(b).localeCompare(String(a));
+                    });
+                    setClasses(sortedClasses);
+                    if (sortedClasses.length > 0) {
+                        const defaultClass = sortedClasses.find((c: string) => c === 'Class_12+') || sortedClasses[0];
                         setSelectedClass(defaultClass);
                     }
                 }
@@ -117,7 +126,7 @@ export default function TeacherDashboard() {
             fetch(`/api/admin/students?class=${encodeURIComponent(selectedClass)}`)
                 .then(res => res.json())
                 .then(data => {
-                    if (Array.isArray(data)) setStudents(data.sort(Intl.Collator().compare));
+                    if (Array.isArray(data)) setStudents(data.sort((a,b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username))));
                 })
                 .catch(console.error);
         }
@@ -136,9 +145,14 @@ export default function TeacherDashboard() {
             });
             const result = await res.json();
             if (result.success) {
-                setStudents(prev => [...prev, newStudentName.trim()].sort(Intl.Collator().compare));
+                // simple refetch to get updated list and roll no.
+                fetch(`/api/admin/students?class=${encodeURIComponent(selectedClass)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (Array.isArray(data)) setStudents(data.sort((a,b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username))));
+                    });
                 setNewStudentName('');
-                alert('Student added successfully!');
+                alert(result.message || 'Student added successfully!');
             } else {
                 alert(result.error || 'Failed to add student');
             }
@@ -160,13 +174,32 @@ export default function TeacherDashboard() {
             });
             const result = await res.json();
             if (result.success) {
-                setStudents(prev => prev.filter(s => s !== studentName));
+                setStudents(prev => prev.map(s => s.username === studentName ? { ...s, status: 'Deleted' } : s));
             } else {
                 alert(result.error || 'Failed to delete student');
             }
         } catch (error) {
             console.error(error);
             alert('Error deleting student');
+        }
+    };
+
+    const handleRestoreStudent = async (studentName: string) => {
+        try {
+            const res = await fetch('/api/admin/students', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ studentName, className: selectedClass, action: 'restore' })
+            });
+            const result = await res.json();
+            if (result.success) {
+                setStudents(prev => prev.map(s => s.username === studentName ? { ...s, status: 'Active' } : s));
+            } else {
+                alert(result.error || 'Failed to restore student');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error restoring student');
         }
     };
 
@@ -350,7 +383,7 @@ export default function TeacherDashboard() {
                                 </div>
                                 <div className="card" style={{ padding: '1.25rem' }}>
                                     <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Students</p>
-                                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981' }}>{students.length}</p>
+                                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981' }}>{students.filter(s => s.status !== 'Deleted').length}</p>
                                 </div>
                             </div>
 
@@ -453,11 +486,11 @@ export default function TeacherDashboard() {
                                     <>
                                         <div style={{ width: '100%', height: 320 }} key={viewMode}>
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }} onClick={(e) => {
+                                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 40 }} onClick={(e) => {
                                                     if (e && e.activeLabel) setSelectedTopic(String(e.activeLabel));
                                                 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                                    <XAxis dataKey="topic" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} />
+                                                    <XAxis dataKey="topic" tick={{ fontSize: 11, fill: '#64748b', dy: 10, dx: -5 }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} angle={-45} textAnchor="end" height={80} />
                                                     <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} unit="%" />
                                                     <Tooltip
                                                         contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }}
@@ -571,7 +604,7 @@ export default function TeacherDashboard() {
                                 }}
                             >
                                 <option value="">Select a student...</option>
-                                {students.map(s => <option key={s} value={s}>{s}</option>)}
+                                {students.filter(s => s.status !== 'Deleted').map(s => <option key={s.username} value={s.username}>{s.username}</option>)}
                             </select>
                         </div>
 
@@ -630,28 +663,74 @@ export default function TeacherDashboard() {
                         </form>
 
                         <div>
-                            <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', marginBottom: '1rem' }}>Enrolled Students List</h4>
-                            {students.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                                    {students.map(student => (
-                                        <div key={student} style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.9rem', color: '#475569', fontWeight: 500, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                                            <span>{student}</span>
-                                            <button 
-                                                onClick={() => handleDeleteStudent(student)}
-                                                style={{
-                                                    background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem', outline: 'none'
-                                                }}
-                                                title="Delete Student"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', marginBottom: '1rem' }}>Enrolled Students</h4>
+                            {students.filter(s => s.status !== 'Deleted').length > 0 ? (
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left', backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b' }}>
+                                                <th style={{ padding: '0.75rem 1rem' }}>Roll Number</th>
+                                                <th style={{ padding: '0.75rem 1rem' }}>Name</th>
+                                                <th style={{ padding: '0.75rem 1rem', width: '80px', textAlign: 'center' }}>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {students.filter(s => s.status !== 'Deleted').map((student, idx) => (
+                                                <tr key={student.username} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 !== 0 ? '#f8fafc' : '#ffffff' }}>
+                                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{student.rollNo || '-'}</td>
+                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{student.username}</td>
+                                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                                        <button 
+                                                            onClick={() => handleDeleteStudent(student.username)}
+                                                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
+                                                            title="Delete Student"
+                                                        >
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             ) : (
                                 <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontStyle: 'italic' }}>No students enrolled in this class yet.</p>
                             )}
                         </div>
+
+                        {students.some(s => s.status === 'Deleted') && (
+                            <div style={{ marginTop: '2rem' }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#ef4444', marginBottom: '1rem' }}>Deleted Students</h4>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left', backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '2px solid #fca5a5', color: '#b91c1c' }}>
+                                                <th style={{ padding: '0.75rem 1rem' }}>Roll Number</th>
+                                                <th style={{ padding: '0.75rem 1rem' }}>Name</th>
+                                                <th style={{ padding: '0.75rem 1rem', width: '80px', textAlign: 'center' }}>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {students.filter(s => s.status === 'Deleted').map((student, idx) => (
+                                                <tr key={student.username} style={{ borderBottom: '1px solid #fecaca' }}>
+                                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#991b1b', textDecoration: 'line-through' }}>{student.rollNo || '-'}</td>
+                                                    <td style={{ padding: '0.75rem 1rem', color: '#991b1b', textDecoration: 'line-through' }}>{student.username}</td>
+                                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                                        <button 
+                                                            onClick={() => handleRestoreStudent(student.username)}
+                                                            style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
+                                                            title="Restore Student"
+                                                        >
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10h10a5 5 0 015 5v2M3 10l6 6m-6-6l6-6"/></svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </main>
