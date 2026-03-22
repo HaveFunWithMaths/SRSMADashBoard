@@ -8,7 +8,8 @@ import StudentDashboardView from '@/components/StudentDashboardView';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 import { toast } from 'react-hot-toast';
 import { COLORS } from '@/lib/designTokens';
-import { BookOpen, TrendingUp, Users } from 'lucide-react';
+import { BookOpen, TrendingUp, Users, Edit2, Download, UploadCloud, FileSpreadsheet } from 'lucide-react';
+import * as xlsx from 'xlsx';
 
 const SUBJECT_COLORS = COLORS.subjects;
 
@@ -43,6 +44,12 @@ export default function TeacherDashboard() {
     const [showCutoffModal, setShowCutoffModal] = useState(false);
     const [customHighCutoff, setCustomHighCutoff] = useState<number | null>(null);
     const [customLowCutoff, setCustomLowCutoff] = useState<number | null>(null);
+
+    // Edit Student Marks in Subject Analysis
+    const [editingStudentRow, setEditingStudentRow] = useState<string | null>(null);
+    const [draftStudentMarks, setDraftStudentMarks] = useState('');
+    const [draftStudentComments, setDraftStudentComments] = useState('');
+    const [isSavingMark, setIsSavingMark] = useState(false);
 
     const refreshBatchData = async () => {
         if (!selectedClass || !selectedSubject) return;
@@ -344,6 +351,109 @@ export default function TeacherDashboard() {
     const uploadMarksArray = uploadStudents.filter(s => s.marks !== '').map(s => Number(s.marks)).filter(m => !isNaN(m));
     const { high: uploadHighCutoff, low: uploadLowCutoff } = calculateCutoffs(uploadMarksArray);
 
+    const handleDownloadTopic = (topic: any) => {
+        try {
+            const d = new Date(topic.date);
+            const wsData = [
+                ["Date", d.toLocaleDateString(), "Total Marks", topic.totalMarks],
+                ["Name", "Marks", "Comments"],
+                ...(topic.students || []).map((s: any) => [s.name, s.marks !== null ? s.marks : 'AB', s.comments || ''])
+            ];
+            const ws = xlsx.utils.aoa_to_sheet(wsData);
+            const wb = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(wb, ws, "Marks");
+            xlsx.writeFile(wb, `${selectedClass}_${selectedSubject}_${topic.topicName.replace(/\//g, '-')}.xlsx`);
+        } catch(e) { toast.error("Failed to download"); }
+    };
+
+    const handleDownloadTemplate = () => {
+        if (!selectedClass || !selectedSubject) return;
+        try {
+            const wsData = [
+                ["Date", uploadDate, "Total Marks", uploadTotalMarks || "100"],
+                ["Name", "Marks", "Comments"],
+                ...students.filter(s => s.status !== 'Deleted').map(s => [s.username, "", ""])
+            ];
+            const ws = xlsx.utils.aoa_to_sheet(wsData);
+            const wb = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(wb, ws, "Marks");
+            xlsx.writeFile(wb, `${selectedClass}_${selectedSubject}_Template.xlsx`);
+        } catch(e) { toast.error("Failed to download"); }
+    };
+
+    const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = xlsx.read(bstr, { type: 'binary', cellDates: true });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data: any[] = xlsx.utils.sheet_to_json(ws, { header: 1 });
+                const row1 = data[0];
+                if (row1 && row1[0] === 'Date' && row1[2] === 'Total Marks') {
+                    if (row1[1]) {
+                        const dateObj = new Date(row1[1]);
+                        if (!isNaN(dateObj.getTime())) setUploadDate(dateObj.toISOString().split('T')[0]);
+                    }
+                    if (row1[3] !== undefined) setUploadTotalMarks(String(row1[3]));
+                }
+                const studentsData = data.slice(2).map(r => ({ name: r[0], marks: r[1] !== undefined && String(r[1]).toUpperCase() !== 'AB' ? String(r[1]) : '', comments: r[2] || '' })).filter(s => s.name);
+                setUploadStudents(prev => {
+                    const next = [...prev];
+                    studentsData.forEach(s => {
+                        const idx = next.findIndex(ps => ps.name === s.name);
+                        if (idx !== -1) next[idx] = { ...next[idx], marks: s.marks, comments: s.comments };
+                        else next.push({ name: s.name, marks: s.marks, comments: s.comments });
+                    });
+                    return next;
+                });
+                toast.success('Excel loaded! You can now verify and save.');
+                e.target.value = '';
+            } catch (err) { toast.error('Failed to parse Excel'); }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const handleSaveStudentMark = async (studentName: string) => {
+        if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
+        const parsedMarks = draftStudentMarks.trim() === '' || draftStudentMarks.trim().toUpperCase() === 'AB' ? null : Number(draftStudentMarks.trim());
+        if (draftStudentMarks.trim() !== '' && draftStudentMarks.trim().toUpperCase() !== 'AB' && (parsedMarks === null || isNaN(parsedMarks) || parsedMarks < 0 || parsedMarks > topicDetails.totalMarks)) {
+            toast.error(`Enter valid marks between 0 and ${topicDetails.totalMarks}`);
+            return;
+        }
+
+        setIsSavingMark(true);
+        try {
+            const res = await fetch('/api/data/performance', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    className: selectedClass,
+                    subject: selectedSubject,
+                    topicName: selectedTopic,
+                    studentName,
+                    marks: parsedMarks,
+                    comments: draftStudentComments
+                })
+            });
+            const result = await res.json();
+            if (result.success) {
+                toast.success('Marks updated');
+                setEditingStudentRow(null);
+                await refreshBatchData();
+            } else {
+                toast.error(result.error || 'Failed to update marks');
+            }
+        } catch (error) {
+            toast.error('Error updating marks');
+        } finally {
+            setIsSavingMark(false);
+        }
+    };
+
     return (
         <>
             <Header />
@@ -552,20 +662,29 @@ export default function TeacherDashboard() {
                                                         </td>
                                                         <td style={{ textAlign: 'center', padding: '0.75rem 1rem', color: '#10b981', fontWeight: 600 }}>{topic.topperPercentage}%</td>
                                                         <td style={{ textAlign: 'right', padding: '0.75rem 1rem' }}>
-                                                            <button
-                                                                onClick={() => setSelectedTopic(topic.topicName)}
-                                                                style={{
-                                                                    border: '1px solid #e2e8f0',
-                                                                    background: '#fff',
-                                                                    cursor: 'pointer',
-                                                                    padding: '0.25rem 0.5rem',
-                                                                    borderRadius: '0.25rem',
-                                                                    color: '#64748b',
-                                                                    fontSize: '0.8rem'
-                                                                }}
-                                                            >
-                                                                View Details
-                                                            </button>
+                                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                <button
+                                                                    onClick={() => handleDownloadTopic(topic)}
+                                                                    title="Download Excel"
+                                                                    style={{ border: 'none', background: 'transparent', color: '#10b981', cursor: 'pointer', padding: '0.25rem' }}
+                                                                >
+                                                                    <Download size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setSelectedTopic(topic.topicName)}
+                                                                    style={{
+                                                                        border: '1px solid #e2e8f0',
+                                                                        background: '#fff',
+                                                                        cursor: 'pointer',
+                                                                        padding: '0.25rem 0.5rem',
+                                                                        borderRadius: '0.25rem',
+                                                                        color: '#64748b',
+                                                                        fontSize: '0.8rem'
+                                                                    }}
+                                                                >
+                                                                    View Details
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -580,7 +699,7 @@ export default function TeacherDashboard() {
                                                     if (e && e.activeLabel) setSelectedTopic(String(e.activeLabel));
                                                 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                                    <XAxis dataKey="topic" tick={{ fontSize: 11, fill: '#64748b', dy: 10, dx: -5 }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} angle={-45} textAnchor="end" height={80} />
+                                                    <XAxis dataKey="topic" tick={{ fontSize: 11, fill: '#64748b', dy: 20, dx: -5 }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} angle={-45} textAnchor="end" height={Math.min(Math.max(60, Math.max(...chartData.map(d => d.topic ? d.topic.length : 0), 10) * 4), 120)} />
                                                     <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} unit="%" />
                                                     <Tooltip
                                                         contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }}
@@ -683,6 +802,7 @@ export default function TeacherDashboard() {
                                                     <th style={{ padding: '0.75rem', textAlign: 'center' }}>Marks</th>
                                                     <th style={{ padding: '0.75rem', textAlign: 'center' }}>%</th>
                                                     <th style={{ padding: '0.75rem', textAlign: 'left' }}>Remarks</th>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'center', width: '80px' }}>Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -701,7 +821,11 @@ export default function TeacherDashboard() {
                                                             {student.name}
                                                         </td>
                                                         <td style={{ padding: '0.75rem', textAlign: 'center', color: '#64748b' }}>
-                                                            {student.marks ?? '-'} <span style={{ fontSize: '0.8em', opacity: 0.7 }}>/ {student.totalMarks}</span>
+                                                            {editingStudentRow === student.name ? (
+                                                                <input type="text" value={draftStudentMarks} onChange={e => setDraftStudentMarks(e.target.value)} style={{ width: '50px', padding: '0.25rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }} disabled={isSavingMark} placeholder="AB" />
+                                                            ) : (
+                                                                <>{student.marks ?? '-'} <span style={{ fontSize: '0.8em', opacity: 0.7 }}>/ {student.totalMarks}</span></>
+                                                            )}
                                                         </td>
                                                         <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                                                             {student.marks !== null ? (
@@ -715,7 +839,23 @@ export default function TeacherDashboard() {
                                                                 </span>
                                                             ) : '-'}
                                                         </td>
-                                                        <td style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.85rem' }}>{student.comments || '-'}</td>
+                                                        <td style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.85rem' }}>
+                                                            {editingStudentRow === student.name ? (
+                                                                <input type="text" value={draftStudentComments} onChange={e => setDraftStudentComments(e.target.value)} style={{ width: '100%', padding: '0.25rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }} disabled={isSavingMark} placeholder="Remarks" />
+                                                            ) : (
+                                                                student.comments || '-'
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                                            {editingStudentRow === student.name ? (
+                                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                    <button onClick={() => handleSaveStudentMark(student.name)} disabled={isSavingMark} style={{ color: '#10b981', border: 'none', background: 'transparent', cursor: 'pointer' }} title="Save"><UploadCloud size={16} /></button>
+                                                                    <button onClick={() => setEditingStudentRow(null)} disabled={isSavingMark} style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer' }} title="Cancel">✕</button>
+                                                                </div>
+                                                            ) : (
+                                                                <button onClick={() => { setEditingStudentRow(student.name); setDraftStudentMarks(student.marks !== null ? String(student.marks) : ''); setDraftStudentComments(student.comments || ''); }} style={{ color: '#64748b', border: 'none', background: 'transparent', cursor: 'pointer' }} title="Edit Marks"><Edit2 size={16} /></button>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -758,7 +898,6 @@ export default function TeacherDashboard() {
                                     studentName={selectedStudent} 
                                     externalActiveSubject={selectedSubject}
                                     onSubjectChange={setSelectedSubject}
-                                    editable
                                     onPerformanceUpdated={refreshBatchData}
                                     onTopicClick={(topic, subject) => {
                                         if (subject && subjects.includes(subject)) {
@@ -884,37 +1023,58 @@ export default function TeacherDashboard() {
 
                 {activeTab === 'upload' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                             <h3 className="card-title" style={{ margin: 0 }}>Upload Marks: {selectedClass.replace('_', ' ')} - {selectedSubject}</h3>
-                            <button
-                                onClick={() => {
-                                    setCustomHighCutoff(uploadHighCutoff !== null ? Number(uploadHighCutoff.toFixed(2)) : null);
-                                    setCustomLowCutoff(uploadLowCutoff !== null ? Number(uploadLowCutoff.toFixed(2)) : null);
-                                    setShowCutoffModal(!showCutoffModal);
-                                    
-                                    // Sort Table by Marks descending
-                                    if (!showCutoffModal) {
-                                        setUploadStudents(prev => [...prev].sort((a,b) => {
-                                            const m1 = Number(a.marks);
-                                            const m2 = Number(b.marks);
-                                            if ((isNaN(m1) || a.marks === '') && (isNaN(m2) || b.marks === '')) return 0;
-                                            if (isNaN(m1) || a.marks === '') return 1;
-                                            if (isNaN(m2) || b.marks === '') return -1;
-                                            return m2 - m1;
-                                        }));
-                                    }
-                                }}
-                                style={{
-                                    backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
-                                    border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
-                                    borderRadius: '0.5rem', cursor: 'pointer', 
-                                    color: showCutoffModal ? '#fff' : '#475569', 
-                                    fontSize: '0.85rem', fontWeight: 600,
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadTemplate}
+                                    style={{
+                                        backgroundColor: '#fff', border: '1px solid #cbd5e1', padding: '0.4rem 0.8rem',
+                                        borderRadius: '0.5rem', cursor: 'pointer', color: '#475569', fontSize: '0.85rem', fontWeight: 600,
+                                        display: 'flex', alignItems: 'center', gap: '0.4rem'
+                                    }}
+                                >
+                                    <FileSpreadsheet size={16} /> Sample Template
+                                </button>
+                                <label style={{
+                                    backgroundColor: '#7c3aed', border: 'none', padding: '0.4rem 0.8rem',
+                                    borderRadius: '0.5rem', cursor: 'pointer', color: '#fff', fontSize: '0.85rem', fontWeight: 600,
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem'
+                                }}>
+                                    <UploadCloud size={16} /> Upload Excel
+                                    <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} style={{ display: 'none' }} />
+                                </label>
+                                <button
+                                    onClick={() => {
+                                        setCustomHighCutoff(uploadHighCutoff !== null ? Number(uploadHighCutoff.toFixed(2)) : null);
+                                        setCustomLowCutoff(uploadLowCutoff !== null ? Number(uploadLowCutoff.toFixed(2)) : null);
+                                        setShowCutoffModal(!showCutoffModal);
+                                        
+                                        // Sort Table by Marks descending
+                                        if (!showCutoffModal) {
+                                            setUploadStudents(prev => [...prev].sort((a,b) => {
+                                                const m1 = Number(a.marks);
+                                                const m2 = Number(b.marks);
+                                                if ((isNaN(m1) || a.marks === '') && (isNaN(m2) || b.marks === '')) return 0;
+                                                if (isNaN(m1) || a.marks === '') return 1;
+                                                if (isNaN(m2) || b.marks === '') return -1;
+                                                return m2 - m1;
+                                            }));
+                                        }
+                                    }}
+                                    style={{
+                                        backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
+                                        border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
+                                        borderRadius: '0.5rem', cursor: 'pointer', 
+                                        color: showCutoffModal ? '#fff' : '#475569', 
+                                        fontSize: '0.85rem', fontWeight: 600,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
+                                </button>
+                            </div>
                         </div>
 
                         {showCutoffModal && (

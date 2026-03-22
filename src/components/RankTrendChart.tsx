@@ -19,6 +19,9 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
         rank: d.rank ?? null
     }));
 
+    const maxTopicLength = Math.max(...data.map(d => d.topic ? d.topic.length : 0), 10);
+    const xAxisHeight = Math.min(Math.max(60, maxTopicLength * 4), 120);
+
     return (
         <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer>
@@ -26,12 +29,12 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
                         dataKey="topic"
-                        tick={{ fontSize: 11, fill: '#64748b', dy: 10, dx: -5 }}
+                        tick={{ fontSize: 11, fill: '#64748b', dy: 20, dx: -5 }}
                         tickLine={false}
                         axisLine={{ stroke: '#cbd5e1' }}
                         angle={-45}
                         textAnchor="end"
-                        height={80}
+                        height={xAxisHeight}
                     />
                     <YAxis
                         reversed

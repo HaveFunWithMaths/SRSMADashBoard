@@ -1,6 +1,6 @@
 'use client';
 
-import { ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { COLORS } from '@/lib/designTokens';
 
 interface PerformanceChartProps {
@@ -12,6 +12,8 @@ const SUBJECT_COLORS = COLORS.subjects;
 
 export default function PerformanceChart({ data, subject }: PerformanceChartProps) {
     const subjectColor = SUBJECT_COLORS[subject as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS['default'];
+    const maxTopicLength = Math.max(...data.map(d => d.topic ? d.topic.length : 0), 10);
+    const xAxisHeight = Math.min(Math.max(60, maxTopicLength * 4), 120);
 
     return (
         <div style={{ width: '100%', height: 350 }}>
@@ -27,12 +29,12 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
                         dataKey="topic"
-                        tick={{ fontSize: 11, fill: '#64748b', dy: 10, dx: -5 }}
+                        tick={{ fontSize: 11, fill: '#64748b', dy: 20, dx: -5 }}
                         tickLine={false}
                         axisLine={{ stroke: '#cbd5e1' }}
                         angle={-45}
                         textAnchor="end"
-                        height={80}
+                        height={xAxisHeight}
                     />
                     <YAxis
                         domain={[0, 100]}
@@ -47,9 +49,7 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                     />
                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
 
-                    {/* Passing reference line */}
-                    <ReferenceLine y={60} stroke="#cbd5e1" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: 'Passing threshold', fill: '#94a3b8', fontSize: 11 }} />
-
+                   
                     <Area
                         type="monotone"
                         dataKey="percentage"
@@ -59,6 +59,7 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                         fillOpacity={1}
                         fill={`url(#colorScore_${subject})`}
                         activeDot={{ r: 6, strokeWidth: 0, fill: subjectColor }}
+                        dot={{ r: 4, fill: subjectColor, strokeWidth: 2 }}
                     />
                     
                     <Line
@@ -68,8 +69,8 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                         stroke={COLORS.success}
                         strokeWidth={2}
                         strokeDasharray="5 5"
-                        dot={false}
-                        activeDot={false}
+                        dot={{ r: 4, fill: COLORS.success, strokeWidth: 2 }}
+                        activeDot={{ r: 6 }}
                     />
                     <Line
                         type="monotone"
@@ -78,8 +79,8 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                         stroke={COLORS.textMuted || '#94a3b8'}
                         strokeWidth={2}
                         strokeDasharray="5 5"
-                        dot={false}
-                        activeDot={false}
+                        dot={{ r: 4, fill: COLORS.textMuted || '#94a3b8', strokeWidth: 2 }}
+                        activeDot={{ r: 6 }}
                     />
                 </ComposedChart>
             </ResponsiveContainer>
