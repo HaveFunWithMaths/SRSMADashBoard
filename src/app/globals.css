@@ -244,33 +244,39 @@ h6 {
   font-weight: 600;
 }
 
-/* Tabs */
+/* Tabs (Pill Style) */
 .tabs {
-  display: flex;
-  gap: 0.5rem;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  display: inline-flex;
+  gap: 4px;
+  border-bottom: none;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .tab-btn {
-  padding: 0.75rem 1.5rem;
-  background: none;
+  padding: 0.6rem 1.25rem;
+  background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   color: var(--color-text-muted);
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
 }
 
 .tab-btn:hover {
   color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .tab-btn.active {
   color: var(--color-primary);
-  border-bottom-color: var(--color-secondary);
-  font-weight: 700;
+  background: white;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 /* Utilities */

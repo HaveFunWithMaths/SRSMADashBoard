@@ -123,7 +123,7 @@ export default function StudentDashboardView({
                         </div>
                         <div className="card">
                             <h3 className="card-title">Rank Consistency</h3>
-                            <RankTrendChart data={subjectData} />
+                            <RankTrendChart data={subjectData} subject={activeSubject} />
                         </div>
                     </div>
 

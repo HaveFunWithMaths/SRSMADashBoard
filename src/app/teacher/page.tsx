@@ -6,14 +6,11 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import StudentDashboardView from '@/components/StudentDashboardView';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
+import { toast } from 'react-hot-toast';
+import { COLORS } from '@/lib/designTokens';
+import { BookOpen, TrendingUp, Users } from 'lucide-react';
 
-const SUBJECT_COLORS: Record<string, string> = {
-    'Maths': '#1a365d',
-    'Physics': '#7c3aed',
-    'Chemistry': '#10b981',
-    'Total': '#f59e0b',
-    'default': '#64748b'
-};
+const SUBJECT_COLORS = COLORS.subjects;
 
 export default function TeacherDashboard() {
     const { data: session, status } = useSession();
@@ -204,13 +201,13 @@ export default function TeacherDashboard() {
             if (result.success) {
                 await refreshStudents();
                 setNewStudentName('');
-                alert(result.message || 'Student added successfully!');
+                toast.success(result.message || 'Student added successfully!');
             } else {
-                alert(result.error || 'Failed to add student');
+                toast.error(result.error || 'Failed to add student');
             }
         } catch (error) {
             console.error(error);
-            alert('Error adding student');
+            toast.error('Error adding student');
         } finally {
             setIsAddingStudent(false);
         }
@@ -227,12 +224,13 @@ export default function TeacherDashboard() {
             const result = await res.json();
             if (result.success) {
                 await refreshStudents();
+                toast.success(`Removed ${studentName}.`);
             } else {
-                alert(result.error || 'Failed to delete student');
+                toast.error(result.error || 'Failed to delete student');
             }
         } catch (error) {
             console.error(error);
-            alert('Error deleting student');
+            toast.error('Error deleting student');
         }
     };
 
@@ -246,12 +244,13 @@ export default function TeacherDashboard() {
             const result = await res.json();
             if (result.success) {
                 await refreshStudents();
+                toast.success(`Restored ${studentName}.`);
             } else {
-                alert(result.error || 'Failed to restore student');
+                toast.error(result.error || 'Failed to restore student');
             }
         } catch (error) {
             console.error(error);
-            alert('Error restoring student');
+            toast.error('Error restoring student');
         }
     };
 
@@ -278,17 +277,17 @@ export default function TeacherDashboard() {
 
             const result = await res.json();
             if (result.success) {
-                alert('Marks uploaded successfully!');
+                toast.success('Marks uploaded successfully!');
                 setUploadTopicName('');
                 setUploadTotalMarks('');
                 setUploadStudents(prev => prev.map(s => ({ ...s, marks: '', comments: '' })));
                 await refreshBatchData();
             } else {
-                alert(result.error || 'Failed to upload marks');
+                toast.error(result.error || 'Failed to upload marks');
             }
         } catch (error) {
             console.error(error);
-            alert('Error uploading marks');
+            toast.error('Error uploading marks');
         } finally {
             setIsUploading(false);
         }
@@ -358,83 +357,28 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+                <div className="tabs">
                     <button
                         onClick={() => setActiveTab('analysis')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderTop: 'none',
-                            borderLeft: 'none',
-                            borderRight: 'none',
-                            borderBottom: activeTab === 'analysis' ? '2px solid #7c3aed' : '2px solid transparent',
-                            color: activeTab === 'analysis' ? '#7c3aed' : '#64748b',
-                            fontWeight: activeTab === 'analysis' ? 600 : 500,
-                            fontSize: '0.95rem',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            outline: 'none'
-                        }}
+                        className={`tab-btn ${activeTab === 'analysis' ? 'active' : ''}`}
                     >
                         Subject Analysis
                     </button>
                     <button
                         onClick={() => setActiveTab('students')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderTop: 'none',
-                            borderLeft: 'none',
-                            borderRight: 'none',
-                            borderBottom: activeTab === 'students' ? '2px solid #7c3aed' : '2px solid transparent',
-                            color: activeTab === 'students' ? '#7c3aed' : '#64748b',
-                            fontWeight: activeTab === 'students' ? 600 : 500,
-                            fontSize: '0.95rem',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            marginLeft: '1rem',
-                            outline: 'none'
-                        }}
+                        className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
                     >
                         Student Dashboard
                     </button>
-                        <button
+                    <button
                         onClick={() => setActiveTab('manage')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderTop: 'none',
-                            borderLeft: 'none',
-                            borderRight: 'none',
-                            borderBottom: activeTab === 'manage' ? '2px solid #7c3aed' : '2px solid transparent',
-                            color: activeTab === 'manage' ? '#7c3aed' : '#64748b',
-                            fontWeight: activeTab === 'manage' ? 600 : 500,
-                            fontSize: '0.95rem',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            marginLeft: '1rem',
-                            outline: 'none'
-                        }}
+                        className={`tab-btn ${activeTab === 'manage' ? 'active' : ''}`}
                     >
                         Class Manager
                     </button>
                     <button
                         onClick={() => setActiveTab('upload')}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            borderTop: 'none',
-                            borderLeft: 'none',
-                            borderRight: 'none',
-                            borderBottom: activeTab === 'upload' ? '2px solid #7c3aed' : '2px solid transparent',
-                            color: activeTab === 'upload' ? '#7c3aed' : '#64748b',
-                            fontWeight: activeTab === 'upload' ? 600 : 500,
-                            fontSize: '0.95rem',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            marginLeft: '1rem',
-                            outline: 'none'
-                        }}
+                        className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
                     >
                         Upload Marks
                     </button>
@@ -474,7 +418,7 @@ export default function TeacherDashboard() {
                                                 fontSize: '0.85rem',
                                                 fontWeight: 600,
                                                 border: selectedSubject === s ? 'none' : '1px solid #e2e8f0',
-                                                backgroundColor: selectedSubject === s ? (SUBJECT_COLORS[s] || '#64748b') : '#fff',
+                                                backgroundColor: selectedSubject === s ? (SUBJECT_COLORS[s as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS.default) : '#fff',
                                                 color: selectedSubject === s ? '#fff' : '#475569',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.2s',
@@ -509,17 +453,26 @@ export default function TeacherDashboard() {
                     ) : (
                         <>
                             {/* Stats Row */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-                                <div className="card" style={{ padding: '1.25rem' }}>
-                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Total Topics</p>
-                                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#1e293b' }}>{batchData.length}</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #1a365d' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>Total Topics</p>
+                                        <BookOpen size={18} color="#1a365d" />
+                                    </div>
+                                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#1a365d' }}>{batchData.length}</p>
                                 </div>
-                                <div className="card" style={{ padding: '1.25rem' }}>
-                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Overall Class Avg</p>
-                                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#7c3aed' }}>{overallAvg}%</p>
+                                <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #d4942a' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>Overall Class Avg</p>
+                                        <TrendingUp size={18} color="#d4942a" />
+                                    </div>
+                                    <p style={{ fontSize: '2rem', fontWeight: 700, color: '#d4942a' }}>{overallAvg}%</p>
                                 </div>
-                                <div className="card" style={{ padding: '1.25rem' }}>
-                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Students</p>
+                                <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>Students</p>
+                                        <Users size={18} color="#10b981" />
+                                    </div>
                                     <p style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981' }}>{students.filter(s => s.status !== 'Deleted').length}</p>
                                 </div>
                             </div>
@@ -590,8 +543,8 @@ export default function TeacherDashboard() {
                                                                 display: 'inline-block',
                                                                 padding: '0.2rem 0.5rem',
                                                                 borderRadius: '0.25rem',
-                                                                backgroundColor: '#ede9fe',
-                                                                color: '#7c3aed',
+                                                                backgroundColor: '#fef3c7',
+                                                                color: '#d4942a',
                                                                 fontWeight: 600
                                                             }}>
                                                                 {topic.classAveragePercentage}%
@@ -634,7 +587,7 @@ export default function TeacherDashboard() {
                                                         formatter={(value: any, name: any) => [`${value}%`, name]}
                                                     />
                                                     <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '0.85rem' }} />
-                                                    <Line type="monotone" dataKey="Class Average" stroke="#7c3aed" strokeWidth={3} dot={{ r: 4, fill: '#7c3aed' }} activeDot={{ r: 6 }} />
+                                                    <Line type="monotone" dataKey="Class Average" stroke="#d4942a" strokeWidth={3} dot={{ r: 4, fill: '#d4942a' }} activeDot={{ r: 6 }} />
                                                     <Line type="monotone" dataKey="Topper" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
                                                 </LineChart>
                                             </ResponsiveContainer>
