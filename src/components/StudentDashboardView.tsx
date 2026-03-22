@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import PerformanceChart from '@/components/PerformanceChart';
 import RankTrendChart from '@/components/RankTrendChart';
 import PerformanceTable from '@/components/PerformanceTable';
+import type { StudentPerformanceRecord } from '@/lib/types';
 
 interface StudentDashboardViewProps {
     studentName: string;
@@ -12,54 +13,67 @@ interface StudentDashboardViewProps {
     onTopicClick?: (topic: string, subject: string) => void;
     externalActiveSubject?: string;
     onSubjectChange?: (subject: string) => void;
+    editable?: boolean;
+    onPerformanceUpdated?: () => Promise<void> | void;
 }
 
-export default function StudentDashboardView({ studentName, showBackToTeacher, onBack, onTopicClick, externalActiveSubject, onSubjectChange }: StudentDashboardViewProps) {
-    const [data, setData] = useState<any[]>([]);
+export default function StudentDashboardView({
+    studentName,
+    showBackToTeacher,
+    onBack,
+    onTopicClick,
+    externalActiveSubject,
+    onSubjectChange,
+    editable = false,
+    onPerformanceUpdated
+}: StudentDashboardViewProps) {
+    const [data, setData] = useState<StudentPerformanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<string[]>([]);
     const [activeSubject, setActiveSubject] = useState<string>('');
 
-    useEffect(() => {
+    const fetchStudentData = useCallback(async () => {
         if (!studentName) return;
         setLoading(true);
-        fetch(`/api/data?type=performance&student=${encodeURIComponent(studentName)}`)
-            .then(res => {
-                if (!res.ok) throw new Error('Failed to fetch data');
-                return res.json();
-            })
-            .then(jsonData => {
-                // Ensure jsonData is an array
-                const safeData = Array.isArray(jsonData) ? jsonData : [];
-                setData(safeData);
+        try {
+            const response = await fetch(`/api/data?type=performance&student=${encodeURIComponent(studentName)}`);
+            if (!response.ok) throw new Error('Failed to fetch data');
 
-                // Extract subjects
-                const dataSubjects = Array.from(new Set(safeData.map((d: any) => d.subject))) as string[];
-                const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
-                const allSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
-                
-                // Sort according to preferred order
-                const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
-                const uniqueSubjects = allSubjects.sort((a, b) => {
-                    const idxA = sortOrder.indexOf(a);
-                    const idxB = sortOrder.indexOf(b);
-                    if (idxA === -1 && idxB === -1) return a.localeCompare(b);
-                    if (idxA === -1) return 1;
-                    if (idxB === -1) return -1;
-                    return idxA - idxB;
-                });
-                
-                setSubjects(uniqueSubjects);
+            const jsonData = await response.json();
+            const safeData: StudentPerformanceRecord[] = Array.isArray(jsonData) ? jsonData : [];
+            setData(safeData);
 
-                if (externalActiveSubject && uniqueSubjects.includes(externalActiveSubject)) {
-                    setActiveSubject(externalActiveSubject);
-                } else if (uniqueSubjects.length > 0) {
-                    setActiveSubject(uniqueSubjects[0]);
-                }
-            })
-            .catch(err => console.error(err))
-            .finally(() => setLoading(false));
-    }, [studentName]);
+            const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
+            const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const allSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
+
+            const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const uniqueSubjects = allSubjects.sort((a, b) => {
+                const idxA = sortOrder.indexOf(a);
+                const idxB = sortOrder.indexOf(b);
+                if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+
+            setSubjects(uniqueSubjects);
+
+            if (externalActiveSubject && uniqueSubjects.includes(externalActiveSubject)) {
+                setActiveSubject(externalActiveSubject);
+            } else if (uniqueSubjects.length > 0) {
+                setActiveSubject((current) => (current && uniqueSubjects.includes(current) ? current : uniqueSubjects[0]));
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    }, [externalActiveSubject, studentName]);
+
+    useEffect(() => {
+        fetchStudentData();
+    }, [fetchStudentData]);
 
     useEffect(() => {
         if (externalActiveSubject && subjects.includes(externalActiveSubject)) {
@@ -115,7 +129,16 @@ export default function StudentDashboardView({ studentName, showBackToTeacher, o
 
                     <div className="card">
                         <h3 className="card-title text-lg mb-4">Detailed Report</h3>
-                        <PerformanceTable data={subjectData} onTopicClick={onTopicClick ? (topic) => onTopicClick(topic, activeSubject) : undefined} />
+                        <PerformanceTable
+                            data={subjectData}
+                            onTopicClick={onTopicClick ? (topic) => onTopicClick(topic, activeSubject) : undefined}
+                            editable={editable}
+                            studentName={studentName}
+                            onRefreshRequested={async () => {
+                                await fetchStudentData();
+                                await onPerformanceUpdated?.();
+                            }}
+                        />
                     </div>
                 </>
             )}

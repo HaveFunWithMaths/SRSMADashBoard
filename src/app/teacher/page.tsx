@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-import PerformanceTable from '@/components/PerformanceTable';
 import StudentDashboardView from '@/components/StudentDashboardView';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 
@@ -47,6 +46,69 @@ export default function TeacherDashboard() {
     const [showCutoffModal, setShowCutoffModal] = useState(false);
     const [customHighCutoff, setCustomHighCutoff] = useState<number | null>(null);
     const [customLowCutoff, setCustomLowCutoff] = useState<number | null>(null);
+
+    const refreshBatchData = async () => {
+        if (!selectedClass || !selectedSubject) return;
+
+        setLoading(true);
+        try {
+            const response = await fetch(`/api/data?type=batch&class=${encodeURIComponent(selectedClass)}&subject=${encodeURIComponent(selectedSubject)}`);
+            const data = await response.json();
+
+            let currentTopics: any[] = [];
+            const currentAllStudents = new Set<string>();
+
+            if (Array.isArray(data) && data.length > 0) {
+                const subject = data[0];
+                currentTopics = subject.topics || [];
+                setBatchData(currentTopics);
+
+                currentTopics.forEach((topic: any) => {
+                    topic.students?.forEach((student: any) => {
+                        if (student.name) currentAllStudents.add(student.name);
+                    });
+                });
+            } else {
+                setBatchData([]);
+            }
+
+            setSelectedTopic((prev) => {
+                if (prev && currentTopics.some((topic: any) => topic.topicName === prev)) return prev;
+                return null;
+            });
+
+            setSelectedStudent((prev) => {
+                if (prev && currentAllStudents.has(prev)) return prev;
+                return '';
+            });
+        } catch (error) {
+            console.error(error);
+            setBatchData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const refreshStudents = async () => {
+        if (!selectedClass) return;
+
+        try {
+            const response = await fetch(`/api/admin/students?class=${encodeURIComponent(selectedClass)}`);
+            const data = await response.json();
+
+            if (Array.isArray(data)) {
+                const sortedStudents = data.sort((a, b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username)));
+                setStudents(sortedStudents);
+
+                const newUploadStudents = sortedStudents
+                    .filter((student) => student.status !== 'Deleted')
+                    .map((student) => ({ name: student.username, marks: '', comments: '' }));
+                setUploadStudents(newUploadStudents);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     useEffect(() => {
         if (status === 'unauthenticated') router.push('/login');
@@ -102,38 +164,7 @@ export default function TeacherDashboard() {
 
     useEffect(() => {
         if (!selectedClass || !selectedSubject) return;
-        setLoading(true);
-        fetch(`/api/data?type=batch&class=${encodeURIComponent(selectedClass)}&subject=${encodeURIComponent(selectedSubject)}`)
-            .then(res => res.json())
-            .then(data => {
-                let currentTopics: any[] = [];
-                let currentAllStudents = new Set<string>();
-
-                if (Array.isArray(data) && data.length > 0) {
-                    const subject = data[0];
-                    currentTopics = subject.topics || [];
-                    setBatchData(currentTopics);
-                    // Extract unique student names from all topics for reference if needed, but array state driven by LoginData
-                    currentTopics.forEach((t: any) => {
-                        t.students?.forEach((s: any) => {
-                            if (s.name) currentAllStudents.add(s.name);
-                        });
-                    });
-                } else {
-                    setBatchData([]);
-                }
-
-                setSelectedTopic(prev => {
-                    if (prev && currentTopics.some((t: any) => t.topicName === prev)) return prev;
-                    return null;
-                });
-                
-                setSelectedStudent(prev => {
-                    if (prev && currentAllStudents.has(prev)) return prev;
-                    return '';
-                });
-            })
-            .finally(() => setLoading(false));
+        refreshBatchData();
     }, [selectedClass, selectedSubject]);
 
     useEffect(() => {
@@ -154,21 +185,7 @@ export default function TeacherDashboard() {
 
     useEffect(() => {
         if (selectedClass) {
-            fetch(`/api/admin/students?class=${encodeURIComponent(selectedClass)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        const sortedStudents = data.sort((a,b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username)));
-                        setStudents(sortedStudents);
-                        
-                        // Initialize upload students array
-                        const newUploadStudents = sortedStudents
-                            .filter(s => s.status !== 'Deleted')
-                            .map(s => ({ name: s.username, marks: '', comments: '' }));
-                        setUploadStudents(newUploadStudents);
-                    }
-                })
-                .catch(console.error);
+            refreshStudents();
         }
     }, [selectedClass]);
 
@@ -185,12 +202,7 @@ export default function TeacherDashboard() {
             });
             const result = await res.json();
             if (result.success) {
-                // simple refetch to get updated list and roll no.
-                fetch(`/api/admin/students?class=${encodeURIComponent(selectedClass)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (Array.isArray(data)) setStudents(data.sort((a,b) => String(a.rollNo || a.username).localeCompare(String(b.rollNo || b.username))));
-                    });
+                await refreshStudents();
                 setNewStudentName('');
                 alert(result.message || 'Student added successfully!');
             } else {
@@ -214,7 +226,7 @@ export default function TeacherDashboard() {
             });
             const result = await res.json();
             if (result.success) {
-                setStudents(prev => prev.map(s => s.username === studentName ? { ...s, status: 'Deleted' } : s));
+                await refreshStudents();
             } else {
                 alert(result.error || 'Failed to delete student');
             }
@@ -233,7 +245,7 @@ export default function TeacherDashboard() {
             });
             const result = await res.json();
             if (result.success) {
-                setStudents(prev => prev.map(s => s.username === studentName ? { ...s, status: 'Active' } : s));
+                await refreshStudents();
             } else {
                 alert(result.error || 'Failed to restore student');
             }
@@ -270,12 +282,7 @@ export default function TeacherDashboard() {
                 setUploadTopicName('');
                 setUploadTotalMarks('');
                 setUploadStudents(prev => prev.map(s => ({ ...s, marks: '', comments: '' })));
-                // Trigger refresh if needed
-                fetch(`/api/data?type=batch&class=${encodeURIComponent(selectedClass)}&subject=${encodeURIComponent(selectedSubject)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (Array.isArray(data) && data.length > 0) setBatchData(data[0].topics || []);
-                    });
+                await refreshBatchData();
             } else {
                 alert(result.error || 'Failed to upload marks');
             }
@@ -332,10 +339,8 @@ export default function TeacherDashboard() {
         ? Math.round(batchData.reduce((a: number, c: any) => a + (c.classAveragePercentage || 0), 0) / batchData.length)
         : 0;
 
-    const subjectColor = SUBJECT_COLORS[selectedSubject] || SUBJECT_COLORS['default'];
-
     const tableMarksArray = tableData.map((s: any) => s.marks);
-    const { mean, sd, high: highCutoff, low: lowCutoff } = calculateCutoffs(tableMarksArray);
+    const { high: highCutoff, low: lowCutoff } = calculateCutoffs(tableMarksArray);
 
     const uploadMarksArray = uploadStudents.filter(s => s.marks !== '').map(s => Number(s.marks)).filter(m => !isNaN(m));
     const { high: uploadHighCutoff, low: uploadLowCutoff } = calculateCutoffs(uploadMarksArray);
@@ -800,6 +805,8 @@ export default function TeacherDashboard() {
                                     studentName={selectedStudent} 
                                     externalActiveSubject={selectedSubject}
                                     onSubjectChange={setSelectedSubject}
+                                    editable
+                                    onPerformanceUpdated={refreshBatchData}
                                     onTopicClick={(topic, subject) => {
                                         if (subject && subjects.includes(subject)) {
                                             setSelectedSubject(subject);

@@ -38,3 +38,16 @@ export interface User {
     role: 'student' | 'teacher' | 'admin';
     class?: string;
 }
+
+export interface StudentPerformanceRecord extends StudentRecord {
+    className?: string;
+    subject: string;
+    topic: string;
+    date: string;
+    totalMarks: number;
+    classAverage: number;
+    standardDeviation: number;
+    topperMarks: number;
+    classAveragePercentage: number;
+    topperPercentage: number;
+}

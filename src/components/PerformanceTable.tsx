@@ -1,11 +1,28 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import type { StudentPerformanceRecord } from '@/lib/types';
+
 interface PerformanceTableProps {
-    data: any[];
+    data: StudentPerformanceRecord[];
     onTopicClick?: (topic: string) => void;
+    editable?: boolean;
+    studentName?: string;
+    onRefreshRequested?: () => Promise<void> | void;
 }
 
-export default function PerformanceTable({ data, onTopicClick }: PerformanceTableProps) {
+export default function PerformanceTable({
+    data,
+    onTopicClick,
+    editable = false,
+    studentName,
+    onRefreshRequested
+}: PerformanceTableProps) {
+    const [editingKey, setEditingKey] = useState<string | null>(null);
+    const [draftMarks, setDraftMarks] = useState('');
+    const [draftComments, setDraftComments] = useState('');
+    const [savingKey, setSavingKey] = useState<string | null>(null);
+
     // Sort by Marks Descending? User said "Default sorted by Marks (Descending)".
     // But props data is likely chronologically sorted for charts.
     // We should clone and sort for table.
@@ -16,7 +33,14 @@ export default function PerformanceTable({ data, onTopicClick }: PerformanceTabl
         return b.marks - a.marks;
     });
 
-    const getHeatmapClass = (row: any) => {
+    useEffect(() => {
+        setEditingKey(null);
+        setDraftMarks('');
+        setDraftComments('');
+        setSavingKey(null);
+    }, [data, studentName]);
+
+    const getHeatmapClass = (row: StudentPerformanceRecord) => {
         if (row.marks === null || row.classAverage === undefined || row.standardDeviation === undefined) {
             return '';
         }
@@ -25,6 +49,74 @@ export default function PerformanceTable({ data, onTopicClick }: PerformanceTabl
         if (row.marks > mean + sd) return 'heatmap-high';
         if (row.marks < mean - sd) return 'heatmap-low';
         return 'heatmap-mid';
+    };
+
+    const getRowKey = (row: StudentPerformanceRecord) => `${row.className ?? ''}::${row.subject ?? ''}::${row.topic ?? ''}::${row.date ?? ''}`;
+
+    const startEditing = (row: StudentPerformanceRecord) => {
+        setEditingKey(getRowKey(row));
+        setDraftMarks(row.marks === null ? '' : String(row.marks));
+        setDraftComments(row.comments ?? '');
+    };
+
+    const cancelEditing = () => {
+        setEditingKey(null);
+        setDraftMarks('');
+        setDraftComments('');
+    };
+
+    const saveRow = async (row: StudentPerformanceRecord) => {
+        if (!studentName || !row.className) {
+            alert('Missing student or class information for this row.');
+            return;
+        }
+
+        const trimmedMarks = draftMarks.trim();
+        const parsedMarks = trimmedMarks === '' ? null : Number(trimmedMarks);
+
+        if (trimmedMarks !== '') {
+            if (parsedMarks === null || Number.isNaN(parsedMarks) || parsedMarks < 0) {
+                alert('Enter a valid marks value or leave it blank for absent.');
+                return;
+            }
+
+            if (typeof row.totalMarks === 'number' && parsedMarks > row.totalMarks) {
+                alert(`Marks cannot be greater than total marks (${row.totalMarks}).`);
+                return;
+            }
+        }
+
+        const rowKey = getRowKey(row);
+        setSavingKey(rowKey);
+
+        try {
+            const response = await fetch('/api/data/performance', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    className: row.className,
+                    subject: row.subject,
+                    topicName: row.topic,
+                    studentName,
+                    marks: parsedMarks,
+                    comments: draftComments
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Failed to update performance');
+            }
+
+            cancelEditing();
+            await onRefreshRequested?.();
+        } catch (error) {
+            console.error(error);
+            const message = error instanceof Error ? error.message : 'Failed to update performance';
+            alert(message);
+        } finally {
+            setSavingKey(null);
+        }
     };
 
     return (
@@ -40,44 +132,145 @@ export default function PerformanceTable({ data, onTopicClick }: PerformanceTabl
                         <th>Class Avg</th>
                         <th>Topper</th>
                         <th>Remarks</th>
+                        {editable && <th>Action</th>}
                     </tr>
                 </thead>
                 <tbody>
-                    {sortedData.map((row, idx) => (
-                        <tr key={idx}>
-                            <td>
-                                {(() => {
-                                    const d = new Date(row.date);
-                                    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getFullYear()).slice(-2)}`;
-                                })()}
-                            </td>
-                            <td 
-                                style={{ 
-                                    fontWeight: 500, 
-                                    color: onTopicClick ? '#7c3aed' : '#1a365d',
-                                    cursor: onTopicClick ? 'pointer' : 'default',
-                                    textDecoration: onTopicClick ? 'underline' : 'none'
-                                }}
-                                onClick={() => onTopicClick?.(row.topic)}
-                                title={onTopicClick ? "View Subject Analysis for this Topic" : undefined}
-                            >
-                                {row.topic}
-                            </td>
-                            <td>
-                                {row.marks === null ? <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Absent</span> : row.marks}
-                                <span style={{ color: '#94a3b8', fontSize: '0.8em' }}> / {row.totalMarks}</span>
-                            </td>
-                            <td className={getHeatmapClass(row)}>
-                                {row.percentage === null ? '-' : `${row.percentage}%`}
-                            </td>
-                            <td>{row.rank === null ? '-' : `#${row.rank}`}</td>
-                            <td>{row.classAverage}%</td>
-                            <td>{row.topperMarks}</td>
-                            <td style={{ maxWidth: '250px', color: '#64748b', fontSize: '0.85rem' }}>
-                                {row.comments || '-'}
-                            </td>
-                        </tr>
-                    ))}
+                    {sortedData.map((row, idx) => {
+                        const rowKey = getRowKey(row);
+                        const isEditing = editable && editingKey === rowKey;
+                        const isSaving = savingKey === rowKey;
+
+                        return (
+                            <tr key={rowKey || idx}>
+                                <td>
+                                    {(() => {
+                                        const d = new Date(row.date);
+                                        return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getFullYear()).slice(-2)}`;
+                                    })()}
+                                </td>
+                                <td
+                                    style={{
+                                        fontWeight: 500,
+                                        color: onTopicClick ? '#7c3aed' : '#1a365d',
+                                        cursor: onTopicClick ? 'pointer' : 'default',
+                                        textDecoration: onTopicClick ? 'underline' : 'none'
+                                    }}
+                                    onClick={() => onTopicClick?.(row.topic)}
+                                    title={onTopicClick ? 'View Subject Analysis for this Topic' : undefined}
+                                >
+                                    {row.topic}
+                                </td>
+                                <td>
+                                    {isEditing ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                value={draftMarks}
+                                                onChange={(event) => setDraftMarks(event.target.value)}
+                                                disabled={isSaving}
+                                                placeholder="AB"
+                                                style={{
+                                                    width: '90px',
+                                                    padding: '0.35rem 0.45rem',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '0.35rem'
+                                                }}
+                                            />
+                                            <span style={{ color: '#94a3b8', fontSize: '0.8em' }}>/ {row.totalMarks}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {row.marks === null ? <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Absent</span> : row.marks}
+                                            <span style={{ color: '#94a3b8', fontSize: '0.8em' }}> / {row.totalMarks}</span>
+                                        </>
+                                    )}
+                                </td>
+                                <td className={getHeatmapClass(row)}>
+                                    {row.percentage === null ? '-' : `${row.percentage}%`}
+                                </td>
+                                <td>{row.rank === null ? '-' : `#${row.rank}`}</td>
+                                <td>{row.classAverage}%</td>
+                                <td>{row.topperMarks}</td>
+                                <td style={{ maxWidth: '250px', color: '#64748b', fontSize: '0.85rem' }}>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={draftComments}
+                                            onChange={(event) => setDraftComments(event.target.value)}
+                                            disabled={isSaving}
+                                            placeholder="Add remarks"
+                                            style={{
+                                                width: '100%',
+                                                minWidth: '180px',
+                                                padding: '0.35rem 0.45rem',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '0.35rem'
+                                            }}
+                                        />
+                                    ) : (
+                                        row.comments || '-'
+                                    )}
+                                </td>
+                                {editable && (
+                                    <td style={{ whiteSpace: 'nowrap' }}>
+                                        {isEditing ? (
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => saveRow(row)}
+                                                    disabled={isSaving}
+                                                    style={{
+                                                        padding: '0.35rem 0.75rem',
+                                                        border: 'none',
+                                                        borderRadius: '0.35rem',
+                                                        backgroundColor: '#10b981',
+                                                        color: '#fff',
+                                                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                                                        opacity: isSaving ? 0.7 : 1
+                                                    }}
+                                                >
+                                                    {isSaving ? 'Saving...' : 'Save'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelEditing}
+                                                    disabled={isSaving}
+                                                    style={{
+                                                        padding: '0.35rem 0.75rem',
+                                                        border: '1px solid #cbd5e1',
+                                                        borderRadius: '0.35rem',
+                                                        backgroundColor: '#fff',
+                                                        color: '#475569',
+                                                        cursor: isSaving ? 'not-allowed' : 'pointer'
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => startEditing(row)}
+                                                style={{
+                                                    padding: '0.35rem 0.75rem',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '0.35rem',
+                                                    backgroundColor: '#fff',
+                                                    color: '#475569',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Edit
+                                            </button>
+                                        )}
+                                    </td>
+                                )}
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>

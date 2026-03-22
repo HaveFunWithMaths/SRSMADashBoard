@@ -250,6 +250,7 @@ export function getStudentData(studentName: string) {
                 if (studentRecord) {
                     studentPerformance.push({
                         ...studentRecord,
+                        className: subject.className,
                         subject: subject.subjectName,
                         topic: topic.topicName,
                         date: topic.date,
@@ -339,6 +340,7 @@ export async function getStudentDataFromDB(studentName: string) {
                 if (studentRecord) {
                     studentPerformance.push({
                         ...studentRecord,
+                        className: subject.className,
                         subject: subject.subjectName,
                         topic: topic.topicName,
                         date: topic.date,

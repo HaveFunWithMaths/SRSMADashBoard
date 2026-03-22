@@ -1,12 +1,13 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import PerformanceChart from '@/components/PerformanceChart';
 import RankTrendChart from '@/components/RankTrendChart';
 import PerformanceTable from '@/components/PerformanceTable';
+import type { StudentPerformanceRecord } from '@/lib/types';
 
 import { Suspense } from 'react';
 
@@ -16,7 +17,7 @@ function DashboardContent() {
     const searchParams = useSearchParams();
     const studentParam = searchParams.get('student');
     // ... existing logic up to return ...
-    const [data, setData] = useState<any[]>([]);
+    const [data, setData] = useState<StudentPerformanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<string[]>([]);
     const [activeSubject, setActiveSubject] = useState<string>('');
@@ -27,22 +28,7 @@ function DashboardContent() {
         }
     }, [status, router]);
 
-    useEffect(() => {
-        if (status === 'loading') return;
-
-        if (session?.user?.role === 'teacher') {
-            if (!studentParam) {
-                router.push('/teacher');
-                return;
-            }
-        }
-
-        if (session?.user?.name) {
-            fetchData();
-        }
-    }, [session, status, studentParam]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             // Determine which student to fetch: param if teacher, otherwise self
             let studentToFetch = session?.user?.name;
@@ -54,10 +40,11 @@ function DashboardContent() {
             if (!res.ok) throw new Error('Failed to fetch data');
             const jsonData = await res.json();
 
-            setData(jsonData);
+            const safeData: StudentPerformanceRecord[] = Array.isArray(jsonData) ? jsonData : [];
+            setData(safeData);
 
             // Extract subjects and inject Chemistry/Total even if no data
-            const dataSubjects = Array.from(new Set(jsonData.map((d: any) => d.subject))) as string[];
+            const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
             const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
             const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
             
@@ -81,7 +68,22 @@ function DashboardContent() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [session?.user?.name, session?.user?.role, studentParam]);
+
+    useEffect(() => {
+        if (status === 'loading') return;
+
+        if (session?.user?.role === 'teacher') {
+            if (!studentParam) {
+                router.push('/teacher');
+                return;
+            }
+        }
+
+        if (session?.user?.name) {
+            fetchData();
+        }
+    }, [fetchData, router, session, status, studentParam]);
 
     if (status === 'loading' || loading) {
         return <div className="flex justify-center items-center h-screen">Loading...</div>;
@@ -145,7 +147,12 @@ function DashboardContent() {
 
                         <div className="card">
                             <h3 className="card-title text-lg mb-4">Detailed Report</h3>
-                            <PerformanceTable data={subjectData} />
+                            <PerformanceTable
+                                data={subjectData}
+                                editable={session.user.role === 'teacher'}
+                                studentName={displayedStudentName || ''}
+                                onRefreshRequested={fetchData}
+                            />
                         </div>
                     </>
                 )}

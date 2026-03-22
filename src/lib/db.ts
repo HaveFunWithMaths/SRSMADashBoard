@@ -89,6 +89,29 @@ export async function getPerformanceDataFromDB(): Promise<any[]> {
     return rows;
 }
 
+export async function updatePerformanceEntry(
+    className: string,
+    subject: string,
+    topicName: string,
+    studentName: string,
+    marks: number | null,
+    comments: string | null
+): Promise<boolean> {
+    const sql = getSQL();
+    const result = await sql`
+        UPDATE performance_marks
+        SET marks = ${marks},
+            comments = ${comments}
+        WHERE class_name = ${className}
+          AND subject = ${subject}
+          AND topic = ${topicName}
+          AND student_name = ${studentName}
+        RETURNING id
+    `;
+
+    return result.length > 0;
+}
+
 // ---------- Queries ----------
 
 /** Get all users (for auth / class listing) */
