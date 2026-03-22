@@ -3,7 +3,6 @@
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen } from 'lucide-react';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -25,7 +24,7 @@ export default function LoginPage() {
             });
 
             if (res?.error) {
-                setError('Invalid credentials');
+                setError('Invalid username or password.');
                 setIsLoading(false);
             } else {
                 router.push('/dashboard');
@@ -38,127 +37,306 @@ export default function LoginPage() {
     };
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-            {/* Left Panel - Branding */}
-            <div style={{
-                flex: '1',
-                backgroundColor: '#1a365d',
-                color: 'white',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: '3rem',
-                position: 'relative',
-                overflow: 'hidden'
-            }} className="hidden md:flex">
-                {/* Decorative background elements */}
-                <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '300px', height: '300px', borderRadius: '50%', background: 'rgba(212, 148, 42, 0.1)', filter: 'blur(40px)' }} />
-                <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: '400px', height: '400px', borderRadius: '50%', background: 'rgba(212, 148, 42, 0.15)', filter: 'blur(60px)' }} />
+        <>
+            <style>{`
+                .login-page {
+                    min-height: 100vh;
+                    min-height: 100dvh;
+                    background-color: #f0f2f5;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 1rem;
+                    font-family: 'Inter', sans-serif;
+                }
 
-                <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: '400px' }}>
-                    <div style={{ width: 120, height: 120, margin: '0 auto 2rem', position: 'relative', borderRadius: '50%', overflow: 'hidden', border: '4px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-                        <img src="/SRSMALogo.jpeg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    </div>
-                    <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '2.5rem', fontWeight: 700, marginBottom: '1rem', color: 'white', lineHeight: 1.2 }}>
-                        Shri Ram Smart Minds Academy
-                    </h1>
-                    <p style={{ color: '#94a3b8', fontSize: '1.1rem', lineHeight: 1.6 }}>
-                        Empowering minds, shaping futures. Access your academic dashboard below.
-                    </p>
+                /* ── Branding Block ── */
+                .login-brand {
+                    text-align: center;
+                    margin-bottom: 1.5rem;
+                }
+
+                .login-brand-logo {
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    border: 3px solid #fff;
+                    box-shadow: 0 4px 16px rgba(26, 54, 93, 0.18);
+                    margin-bottom: 0.85rem;
+                }
+
+                .login-brand-title {
+                    font-family: 'Outfit', sans-serif;
+                    font-size: 1.6rem;
+                    font-weight: 700;
+                    color: #1a365d;
+                    line-height: 1.25;
+                    margin: 0 0 0.25rem;
+                }
+
+                .login-brand-tagline {
+                    font-size: 0.875rem;
+                    color: #64748b;
+                    margin: 0;
+                }
+
+                /* ── Card ── */
+                .login-card {
+                    background: #fff;
+                    border-radius: 16px;
+                    padding: 1.75rem 1.5rem;
+                    width: 100%;
+                    max-width: 396px;
+                    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.09);
+                }
+
+                /* ── Form Fields ── */
+                .login-field {
+                    margin-bottom: 0.85rem;
+                }
+
+                .login-input {
+                    width: 100%;
+                    padding: 0.85rem 1rem;
+                    border: 1.5px solid #dde1e7;
+                    border-radius: 10px;
+                    font-size: 1rem;
+                    font-family: 'Inter', sans-serif;
+                    color: #1e293b;
+                    background: #f8fafc;
+                    transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+                    outline: none;
+                    -webkit-appearance: none;
+                }
+
+                .login-input::placeholder {
+                    color: #94a3b8;
+                }
+
+                .login-input:focus {
+                    border-color: #1877f2;
+                    background: #fff;
+                    box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.12);
+                }
+
+                /* ── Error ── */
+                .login-error {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.7rem 0.9rem;
+                    background: #fff1f2;
+                    border: 1px solid #fda4af;
+                    border-radius: 8px;
+                    color: #be123c;
+                    font-size: 0.875rem;
+                    margin-bottom: 0.85rem;
+                    animation: shake 0.35s ease;
+                }
+
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25%       { transform: translateX(-6px); }
+                    75%       { transform: translateX(6px); }
+                }
+
+                /* ── Submit Button ── */
+                .login-btn {
+                    width: 100%;
+                    padding: 0.875rem;
+                    background: #1877f2;
+                    color: #fff;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 1.05rem;
+                    font-weight: 700;
+                    font-family: 'Outfit', sans-serif;
+                    cursor: pointer;
+                    transition: background 0.18s, transform 0.12s, box-shadow 0.18s;
+                    letter-spacing: 0.01em;
+                    box-shadow: 0 2px 8px rgba(24, 119, 242, 0.25);
+                    margin-top: 0.25rem;
+                }
+
+                .login-btn:hover:not(:disabled) {
+                    background: #166fe5;
+                    box-shadow: 0 4px 14px rgba(24, 119, 242, 0.35);
+                    transform: translateY(-1px);
+                }
+
+                .login-btn:active:not(:disabled) {
+                    transform: translateY(0);
+                    box-shadow: 0 2px 6px rgba(24, 119, 242, 0.2);
+                }
+
+                .login-btn:disabled {
+                    opacity: 0.65;
+                    cursor: not-allowed;
+                }
+
+                /* Loading spinner inside button */
+                .login-btn-inner {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                }
+
+                .login-spinner {
+                    width: 18px;
+                    height: 18px;
+                    border: 2.5px solid rgba(255,255,255,0.4);
+                    border-top-color: #fff;
+                    border-radius: 50%;
+                    animation: spin 0.7s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                /* ── Divider ── */
+                .login-divider {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    margin: 1.25rem 0;
+                    color: #94a3b8;
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .login-divider::before,
+                .login-divider::after {
+                    content: '';
+                    flex: 1;
+                    height: 1px;
+                    background: #e2e8f0;
+                }
+
+                /* ── Footer note ── */
+                .login-footer {
+                    text-align: center;
+                    margin-top: 1.25rem;
+                    font-size: 0.8rem;
+                    color: #94a3b8;
+                }
+
+                /* ── Desktop enhancement ── */
+                @media (min-width: 768px) {
+                    .login-page {
+                        background: linear-gradient(135deg, #f0f2f5 0%, #dde6f0 100%);
+                    }
+
+                    .login-brand-logo {
+                        width: 96px;
+                        height: 96px;
+                    }
+
+                    .login-brand-title {
+                        font-size: 1.9rem;
+                    }
+
+                    .login-card {
+                        padding: 2.25rem 2rem;
+                        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+                    }
+                }
+
+                /* ── Safe area for phones with notch/home bar ── */
+                @supports (padding: env(safe-area-inset-bottom)) {
+                    .login-page {
+                        padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+                        padding-left:   calc(1rem + env(safe-area-inset-left));
+                        padding-right:  calc(1rem + env(safe-area-inset-right));
+                    }
+                }
+            `}</style>
+
+            <div className="login-page">
+                {/* Branding */}
+                <div className="login-brand">
+                    <img
+                        src="/SRSMALogo.jpeg"
+                        alt="SRSMA Logo"
+                        className="login-brand-logo"
+                    />
+                    <h1 className="login-brand-title">SRSMA Portal</h1>
+                    <p className="login-brand-tagline">Shri Ram Smart Minds Academy</p>
                 </div>
-            </div>
 
-            {/* Right Panel - Login Form */}
-            <div style={{
-                flex: '1',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                padding: '2rem',
-                position: 'relative'
-            }}>
-                <div style={{ maxWidth: '400px', width: '100%', margin: '0 auto' }}>
-                    
-                    {/* Mobile Logo (only shows on small screens) */}
-                    <div className="md:hidden" style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                        <div style={{ width: 80, height: 80, margin: '0 auto 1rem', position: 'relative', borderRadius: '50%', overflow: 'hidden', border: '2px solid #e2e8f0' }}>
-                            <img src="/SRSMALogo.jpeg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                        <h2 style={{ fontFamily: 'Outfit, sans-serif', color: '#1a365d', fontSize: '1.5rem', fontWeight: 700 }}>SRSMA Portal</h2>
-                    </div>
-
-                    <div style={{ marginBottom: '2rem' }}>
-                        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '2rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.5rem' }}>
-                            Welcome Back
-                        </h2>
-                        <p style={{ color: '#64748b' }}>Please enter your details to sign in.</p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div>
-                            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '0.5rem' }}>Username</label>
+                {/* Login card */}
+                <div className="login-card">
+                    <form onSubmit={handleSubmit} noValidate>
+                        {/* Username */}
+                        <div className="login-field">
                             <input
+                                id="login-username"
                                 type="text"
-                                placeholder="Student or Teacher ID"
-                                className="auth-input"
-                                style={{ marginBottom: 0 }}
+                                className="login-input"
+                                placeholder="Username or Student ID"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                required
-                            />
-                        </div>
-                        
-                        <div>
-                            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '0.5rem' }}>Password</label>
-                            <input
-                                type="password"
-                                placeholder="••••••••"
-                                className="auth-input"
-                                style={{ marginBottom: 0 }}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="username"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
                                 required
                             />
                         </div>
 
+                        {/* Password */}
+                        <div className="login-field">
+                            <input
+                                id="login-password"
+                                type="password"
+                                className="login-input"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="current-password"
+                                required
+                            />
+                        </div>
+
+                        {/* Error message */}
                         {error && (
-                            <div style={{ padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #f87171', borderRadius: '0.5rem', color: '#b91c1c', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontWeight: 'bold' }}>!</span> {error}
+                            <div className="login-error" role="alert">
+                                <span>⚠️</span>
+                                <span>{error}</span>
                             </div>
                         )}
 
-                        <button 
-                            type="submit" 
-                            className="btn" 
-                            style={{ 
-                                width: '100%', 
-                                marginTop: '0.5rem', 
-                                padding: '0.875rem',
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                opacity: isLoading ? 0.7 : 1,
-                                cursor: isLoading ? 'not-allowed' : 'pointer'
-                            }}
+                        {/* Submit */}
+                        <button
+                            id="login-submit"
+                            type="submit"
+                            className="login-btn"
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Signing in...' : 'Sign In'}
+                            <span className="login-btn-inner">
+                                {isLoading && <span className="login-spinner" aria-hidden="true" />}
+                                {isLoading ? 'Signing in…' : 'Log In'}
+                            </span>
                         </button>
                     </form>
+
+                    <div className="login-divider">or</div>
+
+                    <div className="login-footer">
+                        Contact your teacher or administrator<br />if you&apos;ve forgotten your credentials.
+                    </div>
                 </div>
+
+                {/* Bottom page note */}
+                <p style={{ marginTop: '1.5rem', fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center' }}>
+                    © {new Date().getFullYear()} Shri Ram Smart Minds Academy
+                </p>
             </div>
-            {/* Global style for hiding on mobile using traditional class since we might not have tailwind fully configured */}
-            <style jsx>{`
-                @media (max-width: 768px) {
-                    .md\\:hidden { display: block !important; }
-                    .hidden.md\\:flex { display: none !important; }
-                }
-                @media (min-width: 769px) {
-                    .md\\:hidden { display: none !important; }
-                }
-            `}</style>
-        </div>
+        </>
     );
 }
