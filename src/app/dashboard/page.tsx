@@ -16,6 +16,7 @@ function DashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const studentParam = searchParams.get('student');
+    const subjectParam = searchParams.get('subject');
     // ... existing logic up to return ...
     const [data, setData] = useState<StudentPerformanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -60,7 +61,9 @@ function DashboardContent() {
             
             setSubjects(sortedSubjects);
 
-            if (uniqueSubjects.length > 0) {
+            if (subjectParam && uniqueSubjects.includes(subjectParam)) {
+                setActiveSubject(subjectParam);
+            } else if (uniqueSubjects.length > 0) {
                 setActiveSubject(uniqueSubjects[0]);
             }
         } catch (error) {
@@ -68,7 +71,7 @@ function DashboardContent() {
         } finally {
             setLoading(false);
         }
-    }, [session?.user?.name, session?.user?.role, studentParam]);
+    }, [session?.user?.name, session?.user?.role, studentParam, subjectParam]);
 
     useEffect(() => {
         if (status === 'loading') return;
@@ -84,6 +87,12 @@ function DashboardContent() {
             fetchData();
         }
     }, [fetchData, router, session, status, studentParam]);
+
+    useEffect(() => {
+        if (subjectParam && subjects.includes(subjectParam)) {
+            setActiveSubject(subjectParam);
+        }
+    }, [subjectParam, subjects]);
 
     if (status === 'loading' || loading) {
         return <div className="flex justify-center items-center h-screen">Loading...</div>;

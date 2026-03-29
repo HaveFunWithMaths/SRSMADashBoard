@@ -56,8 +56,17 @@ export async function initializeDatabase(): Promise<void> {
             UNIQUE(class_name, subject, topic, student_name)
         )
     `;
-}
 
+    await sql`
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    `;
+}
 // ---------- Performance Queries ----------
 
 export async function savePerformanceData(
@@ -162,6 +171,39 @@ export async function addStudent(
     `;
 }
 
+/** Rename a student across all tables */
+export async function renameStudent(oldUsername: string, newUsername: string, folderClassName: string): Promise<boolean> {
+    const possibleValues = folderToExcelClassValues(folderClassName);
+    const sql = getSQL();
+    
+    const result = await sql`
+        UPDATE users
+        SET username = ${newUsername}
+        WHERE username = ${oldUsername}
+          AND class = ANY(${possibleValues})
+        RETURNING id
+    `;
+    if (result.length === 0) return false;
+
+    await sql`
+        UPDATE performance_marks
+        SET student_name = ${newUsername}
+        WHERE student_name = ${oldUsername}
+    `;
+
+    try {
+        await sql`
+            UPDATE notifications
+            SET username = ${newUsername}
+            WHERE username = ${oldUsername}
+        `;
+    } catch (e) {
+        // Ignore if notifications table hasn't been created yet
+    }
+
+    return true;
+}
+
 /** Soft-delete a student (set status to 'Deleted') */
 export async function deleteStudent(studentName: string, folderClassName: string): Promise<boolean> {
     const possibleValues = folderToExcelClassValues(folderClassName);
@@ -176,7 +218,18 @@ export async function deleteStudent(studentName: string, folderClassName: string
     return result.length > 0;
 }
 
-/** Restore a soft-deleted student */
+/** Permanently delete a student */
+export async function permanentDeleteStudent(studentName: string, folderClassName: string): Promise<boolean> {
+    const possibleValues = folderToExcelClassValues(folderClassName);
+    const sql = getSQL();
+    const result = await sql`
+        DELETE FROM users
+        WHERE username = ${studentName}
+          AND class = ANY(${possibleValues})
+        RETURNING id
+    `;
+    return result.length > 0;
+}
 export async function restoreStudent(studentName: string, folderClassName: string): Promise<boolean> {
     const possibleValues = folderToExcelClassValues(folderClassName);
     const sql = getSQL();
@@ -246,6 +299,80 @@ export async function getAllClasses(): Promise<string[]> {
         SELECT DISTINCT class FROM users WHERE class IS NOT NULL
     `;
     return rows.map(r => `Class_${String(r.class).trim()}`);
+}
+
+// ---------- Notifications ----------
+
+export async function addNotification(username: string, message: string): Promise<void> {
+    const sql = getSQL();
+    try {
+        await sql`
+            INSERT INTO notifications (username, message)
+            VALUES (${username}, ${message})
+        `;
+    } catch (e: any) {
+        if (e.message && e.message.includes('relation "notifications" does not exist')) {
+            await initializeDatabase();
+            await sql`
+                INSERT INTO notifications (username, message)
+                VALUES (${username}, ${message})
+            `;
+        } else {
+            throw e;
+        }
+    }
+}
+
+export async function editClass(oldClassName: string, newClassName: string): Promise<void> {
+    const sql = getSQL();
+    const oldClassRawArray = folderToExcelClassValues(oldClassName);
+    const newClassRaw = newClassName.replace(/^Class_/i, '');
+
+    await sql`
+        UPDATE users 
+        SET class = ${newClassRaw} 
+        WHERE class = ANY(${oldClassRawArray})
+    `;
+
+    await sql`
+        UPDATE performance_marks 
+        SET class_name = ${newClassName} 
+        WHERE class_name = ${oldClassName}
+    `;
+}
+
+export async function deleteClassFromDB(className: string): Promise<void> {
+    const sql = getSQL();
+    const classRawArray = folderToExcelClassValues(className);
+
+    await sql`
+        DELETE FROM users 
+        WHERE class = ANY(${classRawArray})
+    `;
+
+    await sql`
+        DELETE FROM performance_marks 
+        WHERE class_name = ${className}
+    `;
+}
+
+export async function getUnreadNotifications(username: string): Promise<any[]> {
+    const sql = getSQL();
+    const rows = await sql`
+        SELECT * FROM notifications
+        WHERE username = ${username} AND is_read = FALSE
+        ORDER BY created_at DESC
+    `;
+    return rows;
+}
+
+export async function markNotificationsAsRead(username: string): Promise<void> {
+    const sql = getSQL();
+    await sql`
+        UPDATE notifications
+        SET is_read = TRUE
+        WHERE username = ${username} AND is_read = FALSE
+    `;
 }
 
 // ---------- Helpers ----------

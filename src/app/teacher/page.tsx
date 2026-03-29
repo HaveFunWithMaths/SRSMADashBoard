@@ -51,6 +51,17 @@ export default function TeacherDashboard() {
     const [draftStudentComments, setDraftStudentComments] = useState('');
     const [isSavingMark, setIsSavingMark] = useState(false);
 
+    // Class Management
+    const [newClassNameInput, setNewClassNameInput] = useState('');
+    const [editingClass, setEditingClass] = useState<string | null>(null);
+    const [editedClassName, setEditedClassName] = useState('');
+    const [isManagingClassAction, setIsManagingClassAction] = useState(false);
+
+    // Student Management
+    const [editingStudentName, setEditingStudentName] = useState<string | null>(null);
+    const [editedStudentNameValue, setEditedStudentNameValue] = useState('');
+    const [isManagingStudentAction, setIsManagingStudentAction] = useState(false);
+
     const refreshBatchData = async () => {
         if (!selectedClass || !selectedSubject) return;
 
@@ -118,27 +129,33 @@ export default function TeacherDashboard() {
         if (status === 'unauthenticated') router.push('/login');
     }, [status, router]);
 
-    useEffect(() => {
-        fetch('/api/data?type=classes')
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) {
-                    const order = ['Class_12+', 'Class_12', 'Class_11', 'Class_10', 'Class_9', 'Class_8'];
-                    const sortedClasses = data.sort((a, b) => {
-                        const idxA = order.indexOf(a);
-                        const idxB = order.indexOf(b);
-                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                        if (idxA !== -1) return -1;
-                        if (idxB !== -1) return 1;
-                        return String(b).localeCompare(String(a));
-                    });
-                    setClasses(sortedClasses);
-                    if (sortedClasses.length > 0) {
-                        const defaultClass = sortedClasses.find((c: string) => c === 'Class_12+') || sortedClasses[0];
-                        setSelectedClass(defaultClass);
-                    }
+    const fetchClasses = async () => {
+        try {
+            const res = await fetch('/api/data?type=classes');
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                const order = ['Class_12+', 'Class_12', 'Class_11', 'Class_10', 'Class_9', 'Class_8'];
+                const sortedClasses = data.sort((a, b) => {
+                    const idxA = order.indexOf(a);
+                    const idxB = order.indexOf(b);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return String(b).localeCompare(String(a));
+                });
+                setClasses(sortedClasses);
+                if (sortedClasses.length > 0 && !selectedClass) {
+                    const defaultClass = sortedClasses.find((c: string) => c === 'Class_12+') || sortedClasses[0];
+                    setSelectedClass(defaultClass);
                 }
-            });
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    useEffect(() => {
+        fetchClasses();
     }, []);
 
     useEffect(() => {
@@ -919,7 +936,166 @@ export default function TeacherDashboard() {
 
                 {activeTab === 'manage' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <h3 className="card-title" style={{ marginBottom: '1rem' }}>Manage Class: {selectedClass.replace('_', ' ')}</h3>
+                        <div style={{ marginBottom: '2rem' }}>
+                            <h3 className="card-title" style={{ marginBottom: '1rem' }}>Manage Classes</h3>
+                            
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '1.5rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Add New Class Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g., 11_A"
+                                        value={newClassNameInput}
+                                        onChange={e => setNewClassNameInput(e.target.value)}
+                                        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', fontSize: '0.9rem', outline: 'none' }}
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (newClassNameInput.trim()) {
+                                            const formattedClass = newClassNameInput.trim().toUpperCase().startsWith('CLASS_') ? newClassNameInput.trim() : `Class_${newClassNameInput.trim()}`;
+                                            if (!classes.includes(formattedClass)) {
+                                                setClasses([...classes, formattedClass]);
+                                                setSelectedClass(formattedClass);
+                                                setNewClassNameInput('');
+                                                toast.success('Class added locally! Add a student to save it permanently.');
+                                            } else {
+                                                toast.error('Class already exists');
+                                            }
+                                        }
+                                    }}
+                                    disabled={!newClassNameInput.trim()}
+                                    style={{ padding: '0.6rem 1.5rem', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '0.5rem', fontWeight: 600, cursor: !newClassNameInput.trim() ? 'not-allowed' : 'pointer', opacity: !newClassNameInput.trim() ? 0.7 : 1, height: '42px' }}
+                                >
+                                    + Add Class
+                                </button>
+                            </div>
+                            
+                            <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
+                                <table className="data-table" style={{ width: '100%', backgroundColor: '#fff' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b' }}>
+                                            <th style={{ padding: '0.75rem 1rem' }}>Class Name</th>
+                                            <th style={{ padding: '0.75rem 1rem', width: '150px', textAlign: 'center' }}>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {classes.map((cls, idx) => (
+                                            <tr key={cls} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 !== 0 ? '#f8fafc' : '#ffffff' }}>
+                                                <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
+                                                    {editingClass === cls ? (
+                                                        <input 
+                                                            type="text" 
+                                                            value={editedClassName} 
+                                                            onChange={e => setEditedClassName(e.target.value)} 
+                                                            style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
+                                                        />
+                                                    ) : (
+                                                        cls.replace('Class_', '')
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                                    {editingClass === cls ? (
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    if (!editedClassName.trim() || editedClassName === cls.replace('Class_', '')) {
+                                                                        setEditingClass(null);
+                                                                        return;
+                                                                    }
+                                                                    const newFormatted = editedClassName.toUpperCase().startsWith('CLASS_') ? editedClassName : `Class_${editedClassName}`;
+                                                                    setIsManagingClassAction(true);
+                                                                    try {
+                                                                        const res = await fetch('/api/admin/classes', {
+                                                                            method: 'PATCH',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ oldClassName: cls, newClassName: newFormatted })
+                                                                        });
+                                                                        const json = await res.json();
+                                                                        if (json.success) {
+                                                                            toast.success('Class renamed successfully');
+                                                                            setEditingClass(null);
+                                                                            if (selectedClass === cls) setSelectedClass(newFormatted);
+                                                                            await fetchClasses();
+                                                                        } else {
+                                                                            toast.error(json.error || 'Failed to rename class');
+                                                                        }
+                                                                    } catch (err) {
+                                                                        toast.error('Error renaming class');
+                                                                    }
+                                                                    setIsManagingClassAction(false);
+                                                                }}
+                                                                disabled={isManagingClassAction}
+                                                                style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
+                                                                title="Save"
+                                                            >
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setEditingClass(null)}
+                                                                disabled={isManagingClassAction}
+                                                                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', outline: 'none' }}
+                                                                title="Cancel"
+                                                            >
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setEditingClass(cls);
+                                                                    setEditedClassName(cls.replace('Class_', ''));
+                                                                }}
+                                                                style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', outline: 'none' }}
+                                                                title="Edit Class Name"
+                                                            >
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    if (!window.confirm(`Are you sure you want to PERMANENTLY delete class "${cls.replace('Class_', '')}" and ALL its data?`)) return;
+                                                                    setIsManagingClassAction(true);
+                                                                    try {
+                                                                        const res = await fetch('/api/admin/classes', {
+                                                                            method: 'DELETE',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ className: cls })
+                                                                        });
+                                                                        const json = await res.json();
+                                                                        if (json.success) {
+                                                                            toast.success('Class deleted successfully');
+                                                                            if (selectedClass === cls) setSelectedClass('');
+                                                                            await fetchClasses();
+                                                                        } else {
+                                                                            toast.error(json.error || 'Failed to delete class');
+                                                                        }
+                                                                    } catch (err) {
+                                                                        toast.error('Error deleting class');
+                                                                    }
+                                                                    setIsManagingClassAction(false);
+                                                                }}
+                                                                disabled={isManagingClassAction}
+                                                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
+                                                                title="Delete Class"
+                                                            >
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <hr style={{ border: 'none', borderTop: '2px solid #e2e8f0', margin: '2rem 0' }} />
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h3 className="card-title" style={{ margin: 0 }}>Manage Students for: {selectedClass ? selectedClass.replace('_', ' ') : 'None'}</h3>
+                        </div>
                         
                         <form onSubmit={handleAddStudent} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
                             <div style={{ flex: 1 }}>
@@ -965,15 +1141,83 @@ export default function TeacherDashboard() {
                                             {students.filter(s => s.status !== 'Deleted').map((student, idx) => (
                                                 <tr key={student.username} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 !== 0 ? '#f8fafc' : '#ffffff' }}>
                                                     <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{student.rollNo || '-'}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{student.username}</td>
+                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                                                        {editingStudentName === student.username ? (
+                                                            <input 
+                                                                type="text" 
+                                                                value={editedStudentNameValue} 
+                                                                onChange={e => setEditedStudentNameValue(e.target.value)} 
+                                                                style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
+                                                            />
+                                                        ) : (
+                                                            student.username
+                                                        )}
+                                                    </td>
                                                     <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                                        <button 
-                                                            onClick={() => handleDeleteStudent(student.username)}
-                                                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
-                                                            title="Delete Student"
-                                                        >
-                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
-                                                        </button>
+                                                        {editingStudentName === student.username ? (
+                                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                <button 
+                                                                    onClick={async () => {
+                                                                        if (!editedStudentNameValue.trim() || editedStudentNameValue === student.username) {
+                                                                            setEditingStudentName(null);
+                                                                            return;
+                                                                        }
+                                                                        setIsManagingStudentAction(true);
+                                                                        try {
+                                                                            const res = await fetch('/api/admin/students', {
+                                                                                method: 'PATCH',
+                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                body: JSON.stringify({ action: 'rename', studentName: student.username, newName: editedStudentNameValue.trim(), className: selectedClass })
+                                                                            });
+                                                                            const json = await res.json();
+                                                                            if (json.success) {
+                                                                                toast.success('Student renamed successfully');
+                                                                                setEditingStudentName(null);
+                                                                                await refreshStudents();
+                                                                            } else {
+                                                                                toast.error(json.error || 'Failed to rename student');
+                                                                            }
+                                                                        } catch (err) {
+                                                                            toast.error('Error renaming student');
+                                                                        }
+                                                                        setIsManagingStudentAction(false);
+                                                                    }}
+                                                                    disabled={isManagingStudentAction}
+                                                                    style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
+                                                                    title="Save"
+                                                                >
+                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setEditingStudentName(null)}
+                                                                    disabled={isManagingStudentAction}
+                                                                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', outline: 'none' }}
+                                                                    title="Cancel"
+                                                                >
+                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setEditingStudentName(student.username);
+                                                                        setEditedStudentNameValue(student.username);
+                                                                    }}
+                                                                    style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', outline: 'none' }}
+                                                                    title="Edit Student Name"
+                                                                >
+                                                                    <Edit2 size={16} />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDeleteStudent(student.username)}
+                                                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
+                                                                    title="Delete Student"
+                                                                >
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1003,13 +1247,41 @@ export default function TeacherDashboard() {
                                                     <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#991b1b', textDecoration: 'line-through' }}>{student.rollNo || '-'}</td>
                                                     <td style={{ padding: '0.75rem 1rem', color: '#991b1b', textDecoration: 'line-through' }}>{student.username}</td>
                                                     <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                                        <button 
-                                                            onClick={() => handleRestoreStudent(student.username)}
-                                                            style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
-                                                            title="Restore Student"
-                                                        >
-                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10h10a5 5 0 015 5v2M3 10l6 6m-6-6l6-6"/></svg>
-                                                        </button>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <button 
+                                                                onClick={() => handleRestoreStudent(student.username)}
+                                                                style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
+                                                                title="Restore Student"
+                                                            >
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10h10a5 5 0 015 5v2M3 10l6 6m-6-6l6-6"/></svg>
+                                                            </button>
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    if (!window.confirm(`Are you sure you want to PERMANENTLY delete ${student.username}? This cannot be undone.`)) return;
+                                                                    try {
+                                                                        const res = await fetch('/api/admin/students', {
+                                                                            method: 'DELETE',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ studentName: student.username, className: selectedClass, permanent: true })
+                                                                        });
+                                                                        const result = await res.json();
+                                                                        if (result.success) {
+                                                                            await refreshStudents();
+                                                                            toast.success(`Permanently deleted ${student.username}.`);
+                                                                        } else {
+                                                                            toast.error(result.error || 'Failed to delete student');
+                                                                        }
+                                                                    } catch (error) {
+                                                                        console.error(error);
+                                                                        toast.error('Error permanently deleting student');
+                                                                    }
+                                                                }}
+                                                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
+                                                                title="Permanently Delete Student"
+                                                            >
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}

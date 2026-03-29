@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { updatePerformanceEntry } from '@/lib/db';
+import { updatePerformanceEntry, addNotification } from '@/lib/db';
 
 export async function PATCH(request: Request) {
     const session = await getServerSession(authOptions);
@@ -45,6 +45,10 @@ export async function PATCH(request: Request) {
 
         if (!updated) {
             return NextResponse.json({ error: 'Performance record not found' }, { status: 404 });
+        }
+
+        if (marksValue !== null) {
+            await addNotification(String(studentName), `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
         }
 
         return NextResponse.json({ success: true, message: 'Performance updated successfully' });

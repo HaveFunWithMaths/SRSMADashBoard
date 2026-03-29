@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { savePerformanceData } from '@/lib/db';
+import { savePerformanceData, addNotification } from '@/lib/db';
 
 export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
@@ -34,6 +34,10 @@ export async function POST(request: Request) {
                 marksValue,
                 student.comments || null
             );
+
+            if (marksValue !== null) {
+                await addNotification(student.name, `New marks uploaded for ${subject} - ${topicName}: ${marksValue}/${totalMarks}`);
+            }
         }
 
         return NextResponse.json({ success: true, message: 'Marks uploaded successfully to Database' });

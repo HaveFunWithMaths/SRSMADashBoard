@@ -204,7 +204,7 @@ export default function PerformanceTable({
                                         {row.percentage === null ? '-' : `${row.percentage}%`}
                                     </td>
                                     <td>{row.rank === null ? '-' : `#${row.rank}`}</td>
-                                    <td>{row.classAverage}%</td>
+                                    <td>{row.classAveragePercentage}%</td>
                                     <td>{row.topperMarks}</td>
                                     <td style={{ maxWidth: '250px', color: '#64748b', fontSize: '0.85rem' }}>
                                         {isEditing ? (

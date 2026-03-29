@@ -8,7 +8,9 @@ import {
     deleteStudent,
     restoreStudent,
     getMaxRollSequence,
-    getRawClassValue
+    getRawClassValue,
+    permanentDeleteStudent,
+    renameStudent
 } from '@/lib/db';
 
 export async function GET(req: Request) {
@@ -86,10 +88,18 @@ export async function DELETE(req: Request) {
 
     try {
         const body = await req.json();
-        const { studentName, className } = body;
+        const { studentName, className, permanent } = body;
 
         if (!studentName || !className) {
             return NextResponse.json({ error: 'Missing studentName or className' }, { status: 400 });
+        }
+
+        if (permanent) {
+            const found = await permanentDeleteStudent(studentName, className);
+            if (!found) {
+                return NextResponse.json({ error: 'Student not found in this class' }, { status: 404 });
+            }
+            return NextResponse.json({ success: true, message: 'Student permanently deleted' });
         }
 
         const found = await deleteStudent(studentName, className);
@@ -112,20 +122,30 @@ export async function PATCH(req: Request) {
 
     try {
         const body = await req.json();
-        const { studentName, className, action } = body;
+        const { studentName, className, action, newName } = body;
 
-        if (!studentName || !className || action !== 'restore') {
+        if (!studentName || !className || !action) {
             return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
         }
 
-        const found = await restoreStudent(studentName, className);
-        if (!found) {
-            return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+        if (action === 'rename') {
+            if (!newName) return NextResponse.json({ error: 'Missing new name' }, { status: 400 });
+            const found = await renameStudent(studentName, newName, className);
+            if (!found) {
+                return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+            }
+            return NextResponse.json({ success: true, message: 'Student renamed successfully' });
+        } else if (action === 'restore') {
+            const found = await restoreStudent(studentName, className);
+            if (!found) {
+                return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+            }
+            return NextResponse.json({ success: true, message: 'Student restored successfully' });
+        } else {
+             return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
         }
-
-        return NextResponse.json({ success: true, message: 'Student restored successfully' });
     } catch (e) {
-        console.error('Error restoring student:', e);
-        return NextResponse.json({ error: 'Failed to restore student' }, { status: 500 });
+        console.error('Error in student PATCH:', e);
+        return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
     }
 }
