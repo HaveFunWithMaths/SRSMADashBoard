@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getUnreadNotifications, markNotificationsAsRead } from '@/lib/db';
+import { getUnreadNotifications, markNotificationsAsRead, markNotificationAsReadById } from '@/lib/db';
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
@@ -25,7 +25,12 @@ export async function PATCH(req: Request) {
     }
 
     try {
-        await markNotificationsAsRead(session.user.name!);
+        const body = await req.json().catch(() => ({}));
+        if (body.id) {
+            await markNotificationAsReadById(body.id, session.user.name!);
+        } else {
+            await markNotificationsAsRead(session.user.name!);
+        }
         return NextResponse.json({ success: true });
     } catch (e) {
         console.error('Error updating notifications:', e);

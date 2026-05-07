@@ -1,14 +1,14 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import StudentDashboardView from '@/components/StudentDashboardView';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 import { toast } from 'react-hot-toast';
 import { COLORS } from '@/lib/designTokens';
-import { BookOpen, TrendingUp, Users, Edit2, Download, UploadCloud, FileSpreadsheet } from 'lucide-react';
+import { BookOpen, TrendingUp, Users, Edit2, Download, UploadCloud, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
 import * as xlsx from 'xlsx';
 
 const SUBJECT_COLORS = COLORS.subjects;
@@ -29,6 +29,7 @@ export default function TeacherDashboard() {
     const [selectedStudent, setSelectedStudent] = useState('');
     const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload'>('analysis');
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
+    const [showPerformanceMatrix, setShowPerformanceMatrix] = useState(true);
 
     const [newStudentName, setNewStudentName] = useState('');
     const [isAddingStudent, setIsAddingStudent] = useState(false);
@@ -342,6 +343,36 @@ export default function TeacherDashboard() {
     if (status === 'loading') return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b' }}>Loading...</div>;
     if (!session) return null;
 
+    const pivotTableData = useMemo(() => {
+        if (!batchData || batchData.length === 0) return [];
+        const studentMap: Record<string, any> = {};
+        
+        batchData.forEach(topic => {
+            topic.students?.forEach((s: any) => {
+                if (!studentMap[s.name]) {
+                    studentMap[s.name] = { name: s.name, totalPercentage: 0, presentCount: 0, testMarks: {} };
+                }
+                let p = null;
+                if (s.marks !== null) {
+                    p = s.percentage !== undefined ? s.percentage : Math.round((s.marks / topic.totalMarks) * 100);
+                    studentMap[s.name].totalPercentage += p;
+                    studentMap[s.name].presentCount += 1;
+                }
+                studentMap[s.name].testMarks[topic.topicName] = p;
+            });
+        });
+
+        Object.values(studentMap).forEach(student => {
+            if (student.presentCount > 0) {
+                student.averagePercentage = student.totalPercentage / student.presentCount;
+            } else {
+                student.averagePercentage = -1; // So they go to the bottom
+            }
+        });
+
+        return Object.values(studentMap).sort((a, b) => b.averagePercentage - a.averagePercentage);
+    }, [batchData]);
+
     const chartData = batchData.map(topic => ({
         topic: topic.topicName,
         'Class Average': topic.classAveragePercentage ?? 0,
@@ -602,6 +633,54 @@ export default function TeacherDashboard() {
                                     </div>
                                     <p style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981' }}>{students.filter(s => s.status !== 'Deleted').length}</p>
                                 </div>
+                            </div>
+
+                            {/* Student Performance Matrix */}
+                            <div className="card" style={{ marginBottom: '1.5rem', overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showPerformanceMatrix ? '1rem' : 0 }}>
+                                    <h3 className="card-title" style={{ margin: 0 }}>Student Performance Overview</h3>
+                                    <button 
+                                        onClick={() => setShowPerformanceMatrix(!showPerformanceMatrix)}
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                                    >
+                                        {showPerformanceMatrix ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    </button>
+                                </div>
+                                {showPerformanceMatrix && (
+                                    <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '400px', border: '1px solid #e2e8f0', borderRadius: '0.5rem' }}>
+                                        <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', position: 'relative' }}>
+                                            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                                <tr>
+                                                    <th style={{ position: 'sticky', left: 0, zIndex: 11, backgroundColor: '#f8fafc', textAlign: 'left', padding: '0.75rem 1rem', color: '#64748b', fontWeight: 600, borderBottom: '2px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>Student Name</th>
+                                                    {batchData.map((topic, index) => (
+                                                        <th key={index} style={{ textAlign: 'center', padding: '0.75rem 1rem', color: '#64748b', fontWeight: 600, minWidth: '80px', borderBottom: '2px solid #e2e8f0' }}>
+                                                            {topic.topicName} (%)
+                                                        </th>
+                                                    ))}
+                                                    <th style={{ textAlign: 'center', padding: '0.75rem 1rem', color: '#64748b', fontWeight: 600, minWidth: '90px', borderBottom: '2px solid #e2e8f0' }}>Avg (%)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pivotTableData.map((student, idx) => (
+                                                    <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                                        <td style={{ position: 'sticky', left: 0, zIndex: 5, backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc', padding: '0.75rem 1rem', fontWeight: 500, color: '#334155', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #f1f5f9' }}>{student.name}</td>
+                                                        {batchData.map((topic, tIdx) => {
+                                                            const mark = student.testMarks[topic.topicName];
+                                                            return (
+                                                                <td key={tIdx} style={{ textAlign: 'center', padding: '0.75rem 1rem', color: mark !== null && mark !== undefined ? '#334155' : '#cbd5e1', borderBottom: '1px solid #f1f5f9' }}>
+                                                                    {mark !== null && mark !== undefined ? `${mark}%` : 'AB'}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        <td style={{ textAlign: 'center', padding: '0.75rem 1rem', fontWeight: 600, color: '#1a365d', borderBottom: '1px solid #f1f5f9' }}>
+                                                            {student.averagePercentage === -1 ? 'AB' : `${Number(student.averagePercentage).toFixed(1)}%`}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Batch Performance Trend - Table or Graph */}

@@ -25,12 +25,7 @@ export default function Header() {
     }, [session]);
 
     const handleNotificationsViewed = async () => {
-        if (notifications.length > 0) {
-            await fetch('/api/student/notifications', { method: 'PATCH' });
-            // Keep them in state but mark length conceptually or just empty them
-            // Emptying them implies they disappear from dropdown which might be annoying if they wanted to read them.
-            // But we will fetch again on refresh and they will be gone.
-        }
+        // Keep this if needed elsewhere, but no longer used on Bell click
     };
 
     const parseSubjectFromMessage = (message: string) => {
@@ -60,7 +55,6 @@ export default function Header() {
                                 <button
                                     onClick={() => {
                                         setShowNotifications(!showNotifications);
-                                        if (!showNotifications) handleNotificationsViewed();
                                     }}
                                     style={{
                                         background: 'transparent', border: 'none', cursor: 'pointer',
@@ -95,8 +89,14 @@ export default function Header() {
                                                 <div 
                                                     key={n.id} 
                                                     style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem', color: '#475569', cursor: 'pointer' }}
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         const subj = parseSubjectFromMessage(n.message);
+                                                        setNotifications(prev => prev.filter(x => x.id !== n.id));
+                                                        fetch('/api/student/notifications', {
+                                                            method: 'PATCH',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ id: n.id })
+                                                        }).catch(err => console.error(err));
                                                         setShowNotifications(false);
                                                         if (subj && pathname === '/dashboard') {
                                                             router.push(`/dashboard?subject=${encodeURIComponent(subj)}`);

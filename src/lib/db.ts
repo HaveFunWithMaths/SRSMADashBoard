@@ -375,6 +375,15 @@ export async function markNotificationsAsRead(username: string): Promise<void> {
     `;
 }
 
+export async function markNotificationAsReadById(id: number, username: string): Promise<void> {
+    const sql = getSQL();
+    await sql`
+        UPDATE notifications
+        SET is_read = TRUE
+        WHERE id = ${id} AND username = ${username}
+    `;
+}
+
 // ---------- Helpers ----------
 
 /**
