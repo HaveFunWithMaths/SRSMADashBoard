@@ -10,7 +10,7 @@ import {
     getMaxRollSequence,
     getRawClassValue,
     permanentDeleteStudent,
-    renameStudent
+    updateStudentDetails
 } from '@/lib/db';
 
 export async function GET(req: Request) {
@@ -29,9 +29,11 @@ export async function GET(req: Request) {
     try {
         const students = await getStudentsByClass(className);
         return NextResponse.json(students.map(u => ({
-            username: u.username,
-            rollNo: u.roll_no || '',
-            status: u.status || 'Active'
+            username: u.name,
+            rollNo: u.username || '',
+            status: u.status || 'Active',
+            email: u.email || '',
+            password: u.password || ''
         })));
     } catch (e) {
         console.error('Error reading students from DB:', e);
@@ -62,17 +64,23 @@ export async function POST(req: Request) {
         // Determine the raw class value to store
         const rawClassValue = await getRawClassValue(className);
 
-        // Generate Roll No smartly
+        // Generate Roll No smartly with 26 prefix
         const maxSeq = await getMaxRollSequence(className);
         const classPrefix = className.replace(/^Class_/i, '');
-        const newRollNo = `${classPrefix}${(maxSeq + 1).toString().padStart(2, '0')}`;
+        const newRollNo = `26${classPrefix}${(maxSeq + 1).toString().padStart(2, '0')}`;
+
+        // Generate Random Password
+        const names = ['Ram', 'Sita', 'Raghav', 'Janaki'];
+        const randomName = names[Math.floor(Math.random() * names.length)];
+        const randomDigits = Math.floor(100 + Math.random() * 900);
+        const defaultPassword = `${randomName}${randomDigits}`;
 
         // Insert into database
-        await addStudent(studentName, rawClassValue, newRollNo);
+        await addStudent(studentName, rawClassValue, newRollNo, defaultPassword, '');
 
         return NextResponse.json({
             success: true,
-            message: `Student created successfully. Roll No: ${newRollNo}. Default password: srsma`
+            message: `Student created successfully. Roll No: ${newRollNo}. Default password: ${defaultPassword}`
         });
     } catch (e) {
         console.error('Error adding student:', e);
@@ -122,15 +130,22 @@ export async function PATCH(req: Request) {
 
     try {
         const body = await req.json();
-        const { studentName, className, action, newName } = body;
+        const { studentName, className, action, newName, password, email } = body;
 
         if (!studentName || !className || !action) {
             return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
         }
 
-        if (action === 'rename') {
+        if (action === 'update') {
+            const found = await updateStudentDetails(studentName, newName || studentName, className, password, email);
+            if (!found) {
+                return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+            }
+            return NextResponse.json({ success: true, message: 'Student updated successfully' });
+        } else if (action === 'rename') {
+            // Legacy rename fallback just in case
             if (!newName) return NextResponse.json({ error: 'Missing new name' }, { status: 400 });
-            const found = await renameStudent(studentName, newName, className);
+            const found = await updateStudentDetails(studentName, newName, className);
             if (!found) {
                 return NextResponse.json({ error: 'Student not found' }, { status: 404 });
             }

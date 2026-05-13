@@ -278,7 +278,7 @@ export default function LoginPage() {
                                 id="login-username"
                                 type="text"
                                 className="login-input"
-                                placeholder="Username or Student ID"
+                                placeholder="Username or Roll Number"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 autoComplete="username"

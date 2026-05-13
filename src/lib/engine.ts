@@ -88,7 +88,7 @@ export function calculateStandardDeviation(students: StudentRecord[], mean: numb
 
     if (validMarks.length === 0) return 0;
     
-    const variance = validMarks.reduce((a, b) => a + Math.pow(b - Math.round(mean), 2), 0) / validMarks.length;
+    const variance = validMarks.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / validMarks.length;
     return Math.round(Math.sqrt(variance) * 10) / 10;
 }
 

@@ -205,7 +205,7 @@ export default function PerformanceTable({
                                     </td>
                                     <td>{row.rank === null ? '-' : `#${row.rank}`}</td>
                                     <td>{row.classAveragePercentage}%</td>
-                                    <td>{row.topperMarks}</td>
+                                    <td>{row.topperPercentage !== undefined && row.topperPercentage !== null ? `${row.topperPercentage}%` : (row.topperMarks ?? '-')}</td>
                                     <td style={{ maxWidth: '250px', color: '#64748b', fontSize: '0.85rem' }}>
                                         {isEditing ? (
                                             <input

@@ -16,12 +16,13 @@ function getSQL() {
 
 export interface DBUser {
     id: number;
-    username: string;
+    name: string;
     password: string;
     class: string | null;
     role: string;
-    roll_no: string | null;
+    username: string | null;
     status: string;
+    email: string | null;
 }
 
 // ---------- Schema ----------
@@ -31,14 +32,15 @@ export async function initializeDatabase(): Promise<void> {
     await sql`
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
+            name VARCHAR(255) NOT NULL,
             password VARCHAR(255) NOT NULL DEFAULT 'srsma',
             class VARCHAR(50),
             role VARCHAR(20) NOT NULL DEFAULT 'Student',
-            roll_no VARCHAR(50),
+            username VARCHAR(50),
             status VARCHAR(20) NOT NULL DEFAULT 'Active',
+            email VARCHAR(255),
             created_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(username, class)
+            UNIQUE(name, class)
         )
     `;
     await sql`
@@ -140,7 +142,7 @@ export async function getStudentsByClass(folderClassName: string): Promise<DBUse
         SELECT * FROM users
         WHERE LOWER(role) = 'student'
           AND class = ANY(${possibleValues})
-        ORDER BY roll_no, username
+        ORDER BY username, name
     `;
     return rows as DBUser[];
 }
@@ -151,7 +153,7 @@ export async function studentExists(studentName: string, folderClassName: string
     const sql = getSQL();
     const rows = await sql`
         SELECT 1 FROM users
-        WHERE username = ${studentName}
+        WHERE name = ${studentName}
           AND class = ANY(${possibleValues})
         LIMIT 1
     `;
@@ -162,24 +164,34 @@ export async function studentExists(studentName: string, folderClassName: string
 export async function addStudent(
     username: string,
     rawClassValue: string,
-    rollNo: string
+    rollNo: string,
+    password: string,
+    email: string | null = null
 ): Promise<void> {
     const sql = getSQL();
     await sql`
-        INSERT INTO users (username, password, class, role, roll_no, status)
-        VALUES (${username}, 'srsma', ${rawClassValue}, 'Student', ${rollNo}, 'Active')
+        INSERT INTO users (name, password, class, role, username, status, email)
+        VALUES (${username}, ${password}, ${rawClassValue}, 'Student', ${rollNo}, 'Active', ${email})
     `;
 }
 
-/** Rename a student across all tables */
-export async function renameStudent(oldUsername: string, newUsername: string, folderClassName: string): Promise<boolean> {
+/** Update student details across all tables */
+export async function updateStudentDetails(oldUsername: string, newUsername: string, folderClassName: string, password?: string, email?: string | null): Promise<boolean> {
     const possibleValues = folderToExcelClassValues(folderClassName);
     const sql = getSQL();
     
+    // We only use COALESCE for name (it should always be provided).
+    // For password and email, we use the value directly so that empty strings
+    // can overwrite existing values (allowing the teacher to clear them).
+    const pwVal = password !== undefined ? password : null;
+    const emailVal = email !== undefined ? email : null;
+
     const result = await sql`
         UPDATE users
-        SET username = ${newUsername}
-        WHERE username = ${oldUsername}
+        SET name     = COALESCE(${newUsername}, name),
+            password = CASE WHEN ${pwVal} IS NOT NULL THEN ${pwVal} ELSE password END,
+            email    = CASE WHEN ${emailVal} IS NOT NULL THEN ${emailVal} ELSE email END
+        WHERE name = ${oldUsername}
           AND class = ANY(${possibleValues})
         RETURNING id
     `;
@@ -211,7 +223,7 @@ export async function deleteStudent(studentName: string, folderClassName: string
     const result = await sql`
         UPDATE users
         SET status = 'Deleted'
-        WHERE username = ${studentName}
+        WHERE name = ${studentName}
           AND class = ANY(${possibleValues})
         RETURNING id
     `;
@@ -224,7 +236,7 @@ export async function permanentDeleteStudent(studentName: string, folderClassNam
     const sql = getSQL();
     const result = await sql`
         DELETE FROM users
-        WHERE username = ${studentName}
+        WHERE name = ${studentName}
           AND class = ANY(${possibleValues})
         RETURNING id
     `;
@@ -236,7 +248,7 @@ export async function restoreStudent(studentName: string, folderClassName: strin
     const result = await sql`
         UPDATE users
         SET status = 'Active'
-        WHERE username = ${studentName}
+        WHERE name = ${studentName}
           AND class = ANY(${possibleValues})
         RETURNING id
     `;
@@ -248,16 +260,16 @@ export async function getMaxRollSequence(folderClassName: string): Promise<numbe
     const possibleValues = folderToExcelClassValues(folderClassName);
     const sql = getSQL();
     const rows = await sql`
-        SELECT roll_no FROM users
+        SELECT username FROM users
         WHERE class = ANY(${possibleValues})
-          AND roll_no IS NOT NULL
+          AND username IS NOT NULL
     `;
 
     const classPrefix = folderClassName.replace(/^Class_/i, '');
     let maxSeq = 0;
 
     for (const row of rows) {
-        const roll = String(row.roll_no || '').trim();
+        const roll = String(row.username || '').trim();
         if (roll.startsWith(classPrefix) && roll.length >= classPrefix.length + 2) {
             const seqStr = roll.slice(-2);
             if (/^\d{2}$/.test(seqStr)) {

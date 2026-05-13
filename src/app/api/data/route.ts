@@ -27,7 +27,9 @@ export async function GET(request: Request) {
 
     // Role-based Access Control
     const userRole = session.user.role;
-    const username = session.user.name;
+    // session.user.name is always set to the student's real name (e.g. "Ravi Kumar").
+    // session.user.username is the roll number (login ID, e.g. "2601").
+    const sessionName = session.user.name || '';
 
     try {
         // 1. Get Class List
@@ -61,12 +63,27 @@ export async function GET(request: Request) {
 
         // 3. Get Full Performance Data (Parent/Student View)
         if (type === 'performance' && student) {
-            // Security Check: Parents can only fetch THEIR child's data
-            if (userRole === 'student' && student !== username) {
+            // Security Check: Students can only fetch their own data.
+            // We compare against the session's real name; also handle the case
+            // where the student param is their roll number instead of their name.
+            const sessionUsername = session.user.username || '';
+            const isOwnData =
+                student.toLowerCase().trim() === sessionName.toLowerCase().trim() ||
+                (sessionUsername && student.toLowerCase().trim() === sessionUsername.toLowerCase().trim());
+
+            if (userRole === 'student' && !isOwnData) {
                 return NextResponse.json({ error: 'Forbidden: Access denied to other student data' }, { status: 403 });
             }
 
-            const data = await getStudentDataFromDB(student);
+            // Always look up by the real student name for performance data.
+            // If the student param is the roll number, resolve it to the real name first.
+            let studentNameToFetch = student;
+            if (sessionUsername && student.toLowerCase().trim() === sessionUsername.toLowerCase().trim()) {
+                // Student passed their roll number — use the real name from the session instead.
+                studentNameToFetch = sessionName;
+            }
+
+            const data = await getStudentDataFromDB(studentNameToFetch);
             return NextResponse.json(data);
         }
 

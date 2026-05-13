@@ -33,10 +33,12 @@ export interface ClassData {
 }
 
 export interface User {
-    username: string;
+    name: string;
+    username: string; // Used as roll number / login ID
     password?: string; // Only used internally during auth
     role: 'student' | 'teacher' | 'admin';
     class?: string;
+    email?: string | null;
 }
 
 export interface StudentPerformanceRecord extends StudentRecord {

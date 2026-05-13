@@ -12,16 +12,19 @@ declare module "next-auth" {
             email?: string | null;
             image?: string | null;
             role?: string;
+            username?: string | null; // roll number / login ID
         }
     }
     interface User {
         role?: string;
+        username?: string | null; // roll number / login ID
     }
 }
 
 declare module "next-auth/jwt" {
     interface JWT {
         role?: string;
+        username?: string | null; // roll number / login ID
     }
 }
 
@@ -41,24 +44,22 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.username || !credentials?.password) return null;
 
                 const users = await getUsersFromDB();
-                const user = users.find((u: { username: string }) => u.username.toLowerCase() === credentials.username.toLowerCase());
+
+                // Search by roll number (username field) first, then by actual name as fallback.
+                // This handles DB migrations where the login identifier may have changed.
+                const credLower = credentials.username.toLowerCase().trim();
+                let user = users.find((u) =>
+                    (u.username || '').toLowerCase().trim() === credLower
+                );
+                if (!user) {
+                    user = users.find((u) =>
+                        (u.name || '').toLowerCase().trim() === credLower
+                    );
+                }
 
                 if (!user || !user.password) return null;
 
-                // V1: Plaintext check for legacy support (as per plan discussion, file has plaintext)
-                // BUT also support bcrypt if we migrate. 
-                // For now, checks equality directly because LoginData.xlsx has "12345"
-                // If we want to support hashed, we'd need to hash "12345" and compare. 
-                // Given constraints: "Passwords must be hashed (e.g., bcrypt) in the database."
-                // But database IS the excel file with "12345". 
-                // IMPL: We will compare Plaintext for now. To be secure, the APP should ideally hash them on the fly? 
-                // No, that doesn't verify anything. 
-                // Decision: Compare as is. If we want security, we MUST update the Excel file to contain hashes.
-                // For this task, strict adherence to "Data Ingestion" means we read what's there.
-                // The prompt said "Passwords must be hashed (e.g., bcrypt) in the database."
-                // This likely implies we should HAVE stored hashes. Since we don't, we can't fully meet that constraint without altering the input file.
-                // I will implement a check: if password starts with "$2", compare using bcrypt. Else comparison.
-
+                // Support both bcrypt hashes and plaintext passwords.
                 const isBcrypt = user.password.startsWith('$2');
                 let isValid = false;
 
@@ -70,10 +71,12 @@ export const authOptions: NextAuthOptions = {
 
                 if (!isValid) return null;
 
-                // Return user object compatible with NextAuth
+                // Always return the actual student name as `name` so that
+                // data lookups (which match student_name in performance_marks) work correctly.
                 return {
-                    id: user.username,
-                    name: user.username,
+                    id: user.username || user.name,
+                    name: user.name,       // real display name (e.g. "Ravi Kumar")
+                    username: user.username, // roll number / login ID (e.g. "2601")
                     role: user.role
                 };
             }
@@ -83,14 +86,16 @@ export const authOptions: NextAuthOptions = {
         async jwt({ token, user }) {
             if (user) {
                 token.role = user.role;
-                token.name = user.name;
+                token.name = user.name;       // real name (e.g. "Ravi Kumar")
+                token.username = user.username; // roll number (e.g. "2601")
             }
             return token;
         },
         async session({ session, token }) {
             if (session.user) {
                 session.user.role = token.role as string;
-                session.user.name = token.name as string;
+                session.user.name = token.name as string;         // real name
+                session.user.username = token.username as string; // roll number
             }
             return session;
         }

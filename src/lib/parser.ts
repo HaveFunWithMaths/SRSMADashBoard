@@ -19,17 +19,26 @@ function mapRowToUser(row: any): User {
         mappedRole = role;
     } else {
         // Heuristic fallback
-        const u = String(row.username || '').toLowerCase();
+        const u = String(row.name || row.username || '').toLowerCase();
         if (u === 'srsma') mappedRole = 'teacher';
         else if (u.includes('admin')) mappedRole = 'admin';
         else if (u.includes('teacher')) mappedRole = 'teacher';
     }
 
+    const resolvedName = String(row.name || '').trim();
+    const resolvedUsername = String(row.username || row.roll_no || '').trim();
+
+    if (!resolvedName) {
+        console.warn('[mapRowToUser] WARNING: user id=' + row.id + ' has no name. Roll/username=' + resolvedUsername + '. Check DB migration.');
+    }
+
     return {
-        username: String(row.username || '').trim(),
+        name: resolvedName || resolvedUsername,
+        username: resolvedUsername,
         password: String(row.password || '').trim(),
         class: row.class ? String(row.class).trim() : undefined,
-        role: mappedRole
+        role: mappedRole,
+        email: row.email ? String(row.email).trim() : null
     };
 }
 
@@ -39,7 +48,7 @@ function mapRowToUser(row: any): User {
 export async function getUsersFromDB(): Promise<User[]> {
     try {
         const rows = await getAllUsers();
-        return rows.map(mapRowToUser).filter(u => u.username && u.password);
+        return rows.map(mapRowToUser).filter(u => u.name && u.password);
     } catch (err) {
         console.error('DB getUsersFromDB failed, falling back to Excel:', err);
         return getUsers();
@@ -60,7 +69,8 @@ export function getUsers(): User[] {
     const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
 
     return jsonData.map(row => ({
-        username: String(row.username || row.Username || '').trim(),
+        name: String(row.name || row.username || row.Username || '').trim(),
+        username: String(row.username || row.roll_no || row.Username || '').trim(),
         password: String(row.password || row.Password || '').trim(),
         class: row.class ? String(row.class).trim() : undefined,
         role: (() => {
@@ -72,8 +82,10 @@ export function getUsers(): User[] {
             if (u.includes('admin')) return 'admin';
             if (u.includes('teacher')) return 'teacher';
             return 'student';
-        })()
-    })).filter(u => u.username && u.password);
+        })(),
+
+        email: row.email ? String(row.email).trim() : null
+    })).filter(u => u.name && u.password);
 }
 
 /**
@@ -246,7 +258,7 @@ export function getStudentData(studentName: string) {
     Object.values(allData).forEach(subjects => {
         subjects.forEach(subject => {
             subject.topics.forEach(topic => {
-                const studentRecord = topic.students.find(s => s.name === studentName);
+                const studentRecord = topic.students.find(s => s.name.toLowerCase().trim() === studentName.toLowerCase().trim());
                 if (studentRecord) {
                     studentPerformance.push({
                         ...studentRecord,
@@ -336,7 +348,7 @@ export async function getStudentDataFromDB(studentName: string) {
     Object.values(allData).forEach(subjects => {
         subjects.forEach(subject => {
             subject.topics.forEach(topic => {
-                const studentRecord = topic.students.find(s => s.name === studentName);
+                const studentRecord = topic.students.find(s => s.name.toLowerCase().trim() === studentName.toLowerCase().trim());
                 if (studentRecord) {
                     studentPerformance.push({
                         ...studentRecord,

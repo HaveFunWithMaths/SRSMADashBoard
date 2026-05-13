@@ -98,9 +98,7 @@ export default function Header() {
                                                             body: JSON.stringify({ id: n.id })
                                                         }).catch(err => console.error(err));
                                                         setShowNotifications(false);
-                                                        if (subj && pathname === '/dashboard') {
-                                                            router.push(`/dashboard?subject=${encodeURIComponent(subj)}`);
-                                                        } else if (subj) {
+                                                        if (subj) {
                                                             router.push(`/dashboard?subject=${encodeURIComponent(subj)}`);
                                                         }
                                                     }}
