@@ -188,9 +188,9 @@ export async function updateStudentDetails(oldUsername: string, newUsername: str
 
     const result = await sql`
         UPDATE users
-        SET name     = COALESCE(${newUsername}, name),
-            password = CASE WHEN ${pwVal} IS NOT NULL THEN ${pwVal} ELSE password END,
-            email    = CASE WHEN ${emailVal} IS NOT NULL THEN ${emailVal} ELSE email END
+        SET name     = COALESCE(${newUsername}::text, name),
+            password = CASE WHEN ${pwVal}::text IS NOT NULL THEN ${pwVal}::text ELSE password END,
+            email    = CASE WHEN ${emailVal}::text IS NOT NULL THEN ${emailVal}::text ELSE email END
         WHERE name = ${oldUsername}
           AND class = ANY(${possibleValues})
         RETURNING id
