@@ -43,11 +43,18 @@ export default function StudentDashboardView({
             const safeData: StudentPerformanceRecord[] = Array.isArray(jsonData) ? jsonData : [];
             setData(safeData);
 
+            let is11Or12 = true;
+            if (safeData.length > 0 && safeData[0].className) {
+                is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(safeData[0].className);
+            }
+
             const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
-            const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const requiredSubjects = is11Or12 
+                ? ['Maths', 'Physics', 'Chemistry', 'Total']
+                : ['Maths', 'Physics', 'Chemistry', 'Biology'];
             const allSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
 
-            const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const sortOrder = requiredSubjects;
             const uniqueSubjects = allSubjects.sort((a, b) => {
                 const idxA = sortOrder.indexOf(a);
                 const idxB = sortOrder.indexOf(b);

@@ -28,11 +28,11 @@ export default function Header() {
         // Keep this if needed elsewhere, but no longer used on Bell click
     };
 
-    const parseSubjectFromMessage = (message: string) => {
-        const match1 = message.match(/uploaded for (.*?) - /);
-        if (match1) return match1[1];
-        const match2 = message.match(/marks for (.*?) - /);
-        if (match2) return match2[1];
+    const parseSubjectAndTopic = (message: string) => {
+        const match1 = message.match(/uploaded for (.*?) - (.*?): /);
+        if (match1) return { subject: match1[1].trim(), topic: match1[2].trim() };
+        const match2 = message.match(/marks for (.*?) - (.*?) have been/);
+        if (match2) return { subject: match2[1].trim(), topic: match2[2].trim() };
         return null;
     };
 
@@ -90,7 +90,7 @@ export default function Header() {
                                                     key={n.id} 
                                                     style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem', color: '#475569', cursor: 'pointer' }}
                                                     onClick={async () => {
-                                                        const subj = parseSubjectFromMessage(n.message);
+                                                        const parsed = parseSubjectAndTopic(n.message);
                                                         setNotifications(prev => prev.filter(x => x.id !== n.id));
                                                         fetch('/api/student/notifications', {
                                                             method: 'PATCH',
@@ -98,8 +98,8 @@ export default function Header() {
                                                             body: JSON.stringify({ id: n.id })
                                                         }).catch(err => console.error(err));
                                                         setShowNotifications(false);
-                                                        if (subj) {
-                                                            router.push(`/dashboard?subject=${encodeURIComponent(subj)}`);
+                                                        if (parsed) {
+                                                            router.push(`/dashboard?subject=${encodeURIComponent(parsed.subject)}&flashTopic=${encodeURIComponent(parsed.topic)}`);
                                                         }
                                                     }}
                                                     onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'}

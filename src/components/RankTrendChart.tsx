@@ -2,6 +2,7 @@
 
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { COLORS } from '@/lib/designTokens';
+import FullScreenChart from '@/components/FullScreenChart';
 
 interface RankTrendChartProps {
     data: any[];
@@ -23,9 +24,9 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
     const xAxisHeight = Math.min(Math.max(60, maxTopicLength * 4), 120);
 
     return (
-        <div style={{ width: '100%', height: 350 }}>
+        <FullScreenChart height={350}>
             <ResponsiveContainer>
-                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 40 }}>
+                <LineChart data={chartData} margin={{ top: 15, right: 30, left: 20, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
                         dataKey="topic"
@@ -62,6 +63,6 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
                     />
                 </LineChart>
             </ResponsiveContainer>
-        </div>
+        </FullScreenChart>
     );
 }

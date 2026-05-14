@@ -2,6 +2,7 @@
 
 import { ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { COLORS } from '@/lib/designTokens';
+import FullScreenChart from '@/components/FullScreenChart';
 
 interface PerformanceChartProps {
     data: any[];
@@ -16,9 +17,9 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
     const xAxisHeight = Math.min(Math.max(60, maxTopicLength * 4), 120);
 
     return (
-        <div style={{ width: '100%', height: 350 }}>
+        <FullScreenChart height={350}>
             <ResponsiveContainer>
-                <ComposedChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 40 }}>
+                <ComposedChart data={data} margin={{ top: 15, right: 30, left: 20, bottom: 40 }}>
                     <defs>
                         <linearGradient id={`colorScore_${subject}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={subjectColor} stopOpacity={0.25} />
@@ -84,6 +85,6 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
                     />
                 </ComposedChart>
             </ResponsiveContainer>
-        </div>
+        </FullScreenChart>
     );
 }

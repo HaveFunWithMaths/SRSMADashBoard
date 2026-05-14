@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 import { COLORS } from '@/lib/designTokens';
 import { BookOpen, TrendingUp, Users, Edit2, Download, UploadCloud, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
 import * as xlsx from 'xlsx';
+import FullScreenChart from '@/components/FullScreenChart';
 
 const SUBJECT_COLORS = COLORS.subjects;
 
@@ -170,7 +171,7 @@ export default function TeacherDashboard() {
                     const is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(selectedClass);
                     const requiredSubjects = is11Or12 
                         ? ['Maths', 'Physics', 'Chemistry', 'Total']
-                        : ['Maths', 'Physics', 'Chemistry', 'Biology', 'Total'];
+                        : ['Maths', 'Physics', 'Chemistry', 'Biology'];
                     const merged = Array.from(new Set([...data, ...requiredSubjects]));
                     
                     const sortOrder = requiredSubjects;
@@ -796,22 +797,24 @@ export default function TeacherDashboard() {
                                 ) : (
                                     <>
                                         <div style={{ width: '100%', height: 320 }} key={viewMode}>
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 40 }} onClick={(e) => {
-                                                    if (e && e.activeLabel) setSelectedTopic(String(e.activeLabel));
-                                                }}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                                    <XAxis dataKey="topic" tick={{ fontSize: 11, fill: '#64748b', dy: 20, dx: -5 }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} angle={-45} textAnchor="end" height={Math.min(Math.max(60, Math.max(...chartData.map(d => d.topic ? d.topic.length : 0), 10) * 4), 120)} />
-                                                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} unit="%" />
-                                                    <Tooltip
-                                                        contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }}
-                                                        formatter={(value: any, name: any) => [`${value}%`, name]}
-                                                    />
-                                                    <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '0.85rem' }} />
-                                                    <Line type="monotone" dataKey="Class Average" stroke="#d4942a" strokeWidth={3} dot={{ r: 4, fill: '#d4942a' }} activeDot={{ r: 6 }} />
-                                                    <Line type="monotone" dataKey="Topper" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
-                                                </LineChart>
-                                            </ResponsiveContainer>
+                                            <FullScreenChart height={320}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData} margin={{ top: 15, right: 20, left: 0, bottom: 40 }} onClick={(e) => {
+                                                        if (e && e.activeLabel) setSelectedTopic(String(e.activeLabel));
+                                                    }}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                        <XAxis dataKey="topic" tick={{ fontSize: 11, fill: '#64748b', dy: 20, dx: -5 }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} angle={-45} textAnchor="end" height={Math.min(Math.max(60, Math.max(...chartData.map(d => d.topic ? d.topic.length : 0), 10) * 4), 120)} />
+                                                        <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} unit="%" />
+                                                        <Tooltip
+                                                            contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }}
+                                                            formatter={(value: any, name: any) => [`${value}%`, name]}
+                                                        />
+                                                        <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '0.85rem' }} />
+                                                        <Line type="monotone" dataKey="Class Average" stroke="#d4942a" strokeWidth={3} dot={{ r: 4, fill: '#d4942a' }} activeDot={{ r: 6 }} />
+                                                        <Line type="monotone" dataKey="Topper" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </FullScreenChart>
                                         </div>
                                         <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.75rem', fontStyle: 'italic' }}>
                                             Click any point to view the student breakdown for that topic

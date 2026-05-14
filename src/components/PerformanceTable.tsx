@@ -1,7 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { StudentPerformanceRecord } from '@/lib/types';
+
+function FlashHandler({ onFlash }: { onFlash: (topic: string) => void }) {
+    const searchParams = useSearchParams();
+    const flashTopic = searchParams?.get('flashTopic');
+    
+    useEffect(() => {
+        if (flashTopic) {
+            onFlash(flashTopic);
+        }
+    }, [flashTopic, onFlash]);
+
+    return null;
+}
 
 interface PerformanceTableProps {
     data: StudentPerformanceRecord[];
@@ -39,6 +53,29 @@ export default function PerformanceTable({
         setDraftComments('');
         setSavingKey(null);
     }, [data, studentName]);
+
+    const [flashingTopic, setFlashingTopic] = useState<string | null>(null);
+
+    const handleFlash = useCallback((topic: string) => {
+        setFlashingTopic(topic);
+        setTimeout(() => {
+            const el = document.getElementById(`row-${topic}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+        setTimeout(() => setFlashingTopic(null), 3000);
+    }, []);
+
+    useEffect(() => {
+        const handler = (e: any) => {
+            if (e.detail && e.detail.topic) {
+                handleFlash(e.detail.topic);
+            }
+        };
+        window.addEventListener('scrollToRow', handler);
+        return () => window.removeEventListener('scrollToRow', handler);
+    }, [handleFlash]);
 
     const getHeatmapClass = (row: StudentPerformanceRecord) => {
         if (row.marks === null || row.classAverage === undefined || row.standardDeviation === undefined) {
@@ -121,6 +158,9 @@ export default function PerformanceTable({
 
     return (
         <div>
+            <Suspense fallback={null}>
+                <FlashHandler onFlash={handleFlash} />
+            </Suspense>
             <div className="table-container">
                 <table className="data-table">
                     <thead>
@@ -144,7 +184,14 @@ export default function PerformanceTable({
                             const isSaving = savingKey === rowKey;
 
                             return (
-                                <tr key={rowKey || idx}>
+                                <tr 
+                                    key={rowKey || idx}
+                                    id={`row-${row.topic}`}
+                                    style={{
+                                        backgroundColor: flashingTopic === row.topic ? '#fef08a' : undefined,
+                                        transition: 'background-color 1s ease'
+                                    }}
+                                >
                                     <td>
                                         {(() => {
                                             const d = new Date(row.date);
