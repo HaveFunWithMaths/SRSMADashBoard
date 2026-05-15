@@ -123,6 +123,30 @@ export async function updatePerformanceEntry(
     return result.length > 0;
 }
 
+export async function updateTopicDetails(
+    className: string,
+    oldSubject: string,
+    oldTopicName: string,
+    newSubject: string,
+    newTopicName: string,
+    newTestDate: string,
+    newTotalMarks: number
+): Promise<boolean> {
+    const sql = getSQL();
+    const result = await sql`
+        UPDATE performance_marks
+        SET subject = ${newSubject},
+            topic = ${newTopicName},
+            test_date = ${newTestDate},
+            total_marks = ${newTotalMarks}
+        WHERE class_name = ${className}
+          AND subject = ${oldSubject}
+          AND topic = ${oldTopicName}
+        RETURNING id
+    `;
+    return result.length > 0;
+}
+
 // ---------- Queries ----------
 
 /** Get all users (for auth / class listing) */

@@ -53,6 +53,51 @@ export default function TeacherDashboard() {
     const [draftStudentComments, setDraftStudentComments] = useState('');
     const [isSavingMark, setIsSavingMark] = useState(false);
 
+    // Edit Topic Details
+    const [isEditingTopicDetails, setIsEditingTopicDetails] = useState(false);
+    const [editTopicName, setEditTopicName] = useState('');
+    const [editTopicDate, setEditTopicDate] = useState('');
+    const [editTopicTotalMarks, setEditTopicTotalMarks] = useState('');
+    const [editTopicSubject, setEditTopicSubject] = useState('');
+    const [isSavingTopicDetails, setIsSavingTopicDetails] = useState(false);
+
+    const handleSaveTopicDetails = async () => {
+        if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
+        setIsSavingTopicDetails(true);
+        try {
+            const res = await fetch('/api/admin/topic', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    className: selectedClass,
+                    oldSubject: selectedSubject,
+                    oldTopicName: selectedTopic,
+                    newSubject: editTopicSubject,
+                    newTopicName: editTopicName,
+                    newTestDate: editTopicDate,
+                    newTotalMarks: editTopicTotalMarks
+                })
+            });
+            const result = await res.json();
+            if (result.success) {
+                toast.success('Topic details updated');
+                setIsEditingTopicDetails(false);
+                if (selectedSubject !== editTopicSubject) {
+                    setSelectedSubject(editTopicSubject);
+                } else {
+                    await refreshBatchData();
+                }
+                setSelectedTopic(editTopicName);
+            } else {
+                toast.error(result.error || 'Failed to update topic details');
+            }
+        } catch (error) {
+            toast.error('Error updating topic details');
+        } finally {
+            setIsSavingTopicDetails(false);
+        }
+    };
+
     // Class Management
     const [newClassNameInput, setNewClassNameInput] = useState('');
     const [editingClass, setEditingClass] = useState<string | null>(null);
@@ -827,44 +872,84 @@ export default function TeacherDashboard() {
                             {topicDetails ? (
                                 <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
                                     <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div>
-                                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', margin: 0, fontFamily: 'Outfit, sans-serif' }}>
-                                                {selectedTopic}
-                                            </h3>
-                                            <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                                                {(() => {
-                                                    const d = new Date(topicDetails.date);
-                                                    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getFullYear()).slice(-2)}`;
-                                                })()}
-                                            </p>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '2rem' }}>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Class Avg</span>
-                                                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#7c3aed' }}>{topicDetails.classAveragePercentage ?? 0}%</span>
+                                        {isEditingTopicDetails ? (
+                                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Topic Name</label>
+                                                    <input type="text" value={editTopicName} onChange={e => setEditTopicName(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', outline: 'none' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Date</label>
+                                                    <input type="date" value={editTopicDate} onChange={e => setEditTopicDate(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', outline: 'none' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Total Marks</label>
+                                                    <input type="number" value={editTopicTotalMarks} onChange={e => setEditTopicTotalMarks(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', outline: 'none', width: '80px' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Subject</label>
+                                                    <select value={editTopicSubject} onChange={e => setEditTopicSubject(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', outline: 'none' }}>
+                                                        {subjects.filter(s => s !== 'Total').map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem' }}>
+                                                    <button onClick={handleSaveTopicDetails} disabled={isSavingTopicDetails} style={{ padding: '0.4rem 0.8rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}>Save</button>
+                                                    <button onClick={() => setIsEditingTopicDetails(false)} disabled={isSavingTopicDetails} style={{ padding: '0.4rem 0.8rem', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}>Cancel</button>
+                                                </div>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Total Marks</span>
-                                                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{topicDetails.totalMarks}</span>
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    setCustomHighCutoff(highCutoff !== null ? Number(highCutoff.toFixed(2)) : null);
-                                                    setCustomLowCutoff(lowCutoff !== null ? Number(lowCutoff.toFixed(2)) : null);
-                                                    setShowCutoffModal(!showCutoffModal);
-                                                }}
-                                                style={{
-                                                    backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
-                                                    border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
-                                                    borderRadius: '0.5rem', cursor: 'pointer', 
-                                                    color: showCutoffModal ? '#fff' : '#475569', 
-                                                    fontSize: '0.85rem', fontWeight: 600,
-                                                    transition: 'all 0.2s'
-                                                }}
-                                            >
-                                                {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
-                                            </button>
-                                        </div>
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', margin: 0, fontFamily: 'Outfit, sans-serif' }}>
+                                                            {selectedTopic}
+                                                        </h3>
+                                                        <button onClick={() => {
+                                                            setEditTopicName(selectedTopic || '');
+                                                            setEditTopicDate(topicDetails.date ? new Date(topicDetails.date).toISOString().split('T')[0] : '');
+                                                            setEditTopicTotalMarks(String(topicDetails.totalMarks));
+                                                            setEditTopicSubject(selectedSubject);
+                                                            setIsEditingTopicDetails(true);
+                                                        }} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Edit Test Details">
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                                                        {(() => {
+                                                            const d = new Date(topicDetails.date);
+                                                            return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getFullYear()).slice(-2)}`;
+                                                        })()}
+                                                    </p>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '2rem' }}>
+                                                    <div style={{ textAlign: 'right' }}>
+                                                        <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Class Avg</span>
+                                                        <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#7c3aed' }}>{topicDetails.classAveragePercentage ?? 0}%</span>
+                                                    </div>
+                                                    <div style={{ textAlign: 'right' }}>
+                                                        <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Total Marks</span>
+                                                        <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{topicDetails.totalMarks}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setCustomHighCutoff(highCutoff !== null ? Number(highCutoff.toFixed(2)) : null);
+                                                            setCustomLowCutoff(lowCutoff !== null ? Number(lowCutoff.toFixed(2)) : null);
+                                                            setShowCutoffModal(!showCutoffModal);
+                                                        }}
+                                                        style={{
+                                                            backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
+                                                            border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
+                                                            borderRadius: '0.5rem', cursor: 'pointer', 
+                                                            color: showCutoffModal ? '#fff' : '#475569', 
+                                                            fontSize: '0.85rem', fontWeight: 600,
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                    >
+                                                        {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
 
                                     {showCutoffModal && (
