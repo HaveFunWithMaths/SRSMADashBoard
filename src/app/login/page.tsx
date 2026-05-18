@@ -27,6 +27,17 @@ export default function LoginPage() {
                 setError('Invalid username or password.');
                 setIsLoading(false);
             } else {
+                // Fire-and-forget: log login analytics (device/browser/OS)
+                fetch('/api/analytics/log-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username,
+                        name: null, // session not yet available
+                        role: null,
+                        userAgent: navigator.userAgent,
+                    }),
+                }).catch(() => {}); // silently ignore errors
                 router.push('/dashboard');
                 router.refresh();
             }
@@ -286,6 +297,7 @@ export default function LoginPage() {
                                 autoCorrect="off"
                                 spellCheck={false}
                                 required
+                                suppressHydrationWarning
                             />
                         </div>
 
@@ -300,6 +312,7 @@ export default function LoginPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 autoComplete="current-password"
                                 required
+                                suppressHydrationWarning
                             />
                         </div>
 
@@ -317,6 +330,7 @@ export default function LoginPage() {
                             type="submit"
                             className="login-btn"
                             disabled={isLoading}
+                            suppressHydrationWarning
                         >
                             <span className="login-btn-inner">
                                 {isLoading && <span className="login-spinner" aria-hidden="true" />}

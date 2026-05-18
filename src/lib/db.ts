@@ -68,6 +68,32 @@ export async function initializeDatabase(): Promise<void> {
             created_at TIMESTAMP DEFAULT NOW()
         )
     `;
+
+    await sql`
+        CREATE TABLE IF NOT EXISTS user_login_logs (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(255) NOT NULL,
+            name VARCHAR(255),
+            role VARCHAR(50),
+            user_agent TEXT,
+            device_type VARCHAR(50),
+            browser VARCHAR(100),
+            os VARCHAR(100),
+            login_time TIMESTAMP DEFAULT NOW()
+        )
+    `;
+
+    await sql`
+        CREATE TABLE IF NOT EXISTS feedback (
+            id SERIAL PRIMARY KEY,
+            parent_name VARCHAR(255),
+            student_name VARCHAR(255),
+            message TEXT NOT NULL,
+            teacher_reply TEXT,
+            replied_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    `;
 }
 // ---------- Performance Queries ----------
 
@@ -418,6 +444,245 @@ export async function markNotificationAsReadById(id: number, username: string): 
         SET is_read = TRUE
         WHERE id = ${id} AND username = ${username}
     `;
+}
+
+// ---------- Analytics ----------
+
+/** Parse userAgent string into device, browser, os */
+function parseUserAgent(ua: string): { device: string; browser: string; os: string } {
+    const uaLower = ua.toLowerCase();
+
+    // Device
+    let device = 'Desktop';
+    if (/mobile|android.*mobile|iphone|ipod|blackberry|windows phone/i.test(ua)) {
+        device = 'Mobile';
+    } else if (/tablet|ipad|android(?!.*mobile)/i.test(ua)) {
+        device = 'Tablet';
+    }
+
+    // Browser
+    let browser = 'Other';
+    if (/edg\//i.test(ua)) browser = 'Edge';
+    else if (/opr\//i.test(ua)) browser = 'Opera';
+    else if (/chrome\//i.test(ua) && !/chromium/i.test(ua)) browser = 'Chrome';
+    else if (/firefox\//i.test(ua)) browser = 'Firefox';
+    else if (/safari\//i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+    else if (/msie|trident/i.test(ua)) browser = 'IE';
+
+    // OS
+    let os = 'Other';
+    if (/windows nt/i.test(ua)) os = 'Windows';
+    else if (/mac os x/i.test(ua) && !/iphone|ipad/i.test(ua)) os = 'macOS';
+    else if (/android/i.test(ua)) os = 'Android';
+    else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS';
+    else if (/linux/i.test(ua)) os = 'Linux';
+
+    return { device, browser, os };
+}
+
+export async function logUserLogin(
+    username: string,
+    name: string | null,
+    role: string | null,
+    userAgent: string
+): Promise<void> {
+    const sql = getSQL();
+    const { device, browser, os } = parseUserAgent(userAgent);
+
+    if (!name || !role) {
+        try {
+            const userRows = await sql`SELECT name, role FROM users WHERE username = ${username} LIMIT 1`;
+            if (userRows.length > 0) {
+                if (!name) name = userRows[0].name;
+                if (!role) role = userRows[0].role;
+            }
+        } catch (e) {
+            console.error('Error fetching user details for login log:', e);
+        }
+    }
+
+    try {
+        await sql`
+            INSERT INTO user_login_logs (username, name, role, user_agent, device_type, browser, os)
+            VALUES (${username}, ${name}, ${role}, ${userAgent}, ${device}, ${browser}, ${os})
+        `;
+    } catch (e: any) {
+        if (e.message?.includes('relation "user_login_logs" does not exist')) {
+            await initializeDatabase();
+            await sql`
+                INSERT INTO user_login_logs (username, name, role, user_agent, device_type, browser, os)
+                VALUES (${username}, ${name}, ${role}, ${userAgent}, ${device}, ${browser}, ${os})
+            `;
+        }
+    }
+}
+
+export async function getLoginStats(activePeriodDays?: number, fromDate?: string, toDate?: string): Promise<any> {
+    const sql = getSQL();
+    try {
+        const useRange = !!(fromDate && toDate);
+        const useDays = !!(!useRange && activePeriodDays);
+
+        // Last login per user
+        const lastLogins = await sql`
+            SELECT DISTINCT ON (username) username, name, role, device_type, browser, os, login_time
+            FROM user_login_logs
+            WHERE LOWER(role) = 'student'
+              AND (
+                (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
+                (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+              )
+            ORDER BY username, login_time DESC
+        `;
+
+        // Total logins today
+        const todayLogins = await sql`
+            SELECT COUNT(*) as count FROM user_login_logs
+            WHERE login_time >= NOW() - INTERVAL '1 day'
+        `;
+
+        // Active users in selected period
+        const periodSql = await sql`
+            SELECT COUNT(DISTINCT username) as count FROM user_login_logs
+            WHERE (
+                (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
+                (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+            )
+        `;
+
+        // Device breakdown
+        const deviceBreakdown = await sql`
+            SELECT device_type, COUNT(*) as count
+            FROM user_login_logs
+            WHERE (
+                (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
+                (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+            )
+            GROUP BY device_type
+            ORDER BY count DESC
+        `;
+
+        // Browser breakdown
+        const browserBreakdown = await sql`
+            SELECT browser, COUNT(*) as count
+            FROM user_login_logs
+            WHERE (
+                (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
+                (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+            )
+            GROUP BY browser
+            ORDER BY count DESC
+        `;
+
+        // OS breakdown
+        const osBreakdown = await sql`
+            SELECT os, COUNT(*) as count
+            FROM user_login_logs
+            WHERE (
+                (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
+                (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+            )
+            GROUP BY os
+            ORDER BY count DESC
+        `;
+
+        // Login trend
+        const loginTrend = await sql`
+            SELECT DATE(login_time) as date, COUNT(*) as count
+            FROM user_login_logs
+            WHERE (
+                (${useRange}::boolean = false AND ${useDays}::boolean = false AND login_time >= NOW() - INTERVAL '30 days') OR
+                (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+            )
+            GROUP BY DATE(login_time)
+            ORDER BY date ASC
+        `;
+
+        // Total users
+        const totalUsers = await sql`SELECT COUNT(*) as count FROM users WHERE status != 'Deleted'`;
+
+        return {
+            lastLogins,
+            todayLogins: Number(todayLogins[0]?.count ?? 0),
+            activeUsers: Number(periodSql[0]?.count ?? 0),
+            deviceBreakdown,
+            browserBreakdown,
+            osBreakdown,
+            loginTrend,
+            totalUsers: Number(totalUsers[0]?.count ?? 0),
+        };
+    } catch (e: any) {
+        if (e.message?.includes('relation "user_login_logs" does not exist')) {
+            await initializeDatabase();
+            return { lastLogins: [], todayLogins: 0, activeUsers: 0, deviceBreakdown: [], browserBreakdown: [], osBreakdown: [], loginTrend: [], totalUsers: 0 };
+        }
+        throw e;
+    }
+}
+
+// ---------- Feedback ----------
+
+export async function saveFeedback(
+    parentName: string | null,
+    studentName: string | null,
+    message: string
+): Promise<void> {
+    const sql = getSQL();
+    try {
+        await sql`
+            INSERT INTO feedback (parent_name, student_name, message)
+            VALUES (${parentName}, ${studentName}, ${message})
+        `;
+    } catch (e: any) {
+        if (e.message?.includes('relation "feedback" does not exist')) {
+            await initializeDatabase();
+            await sql`
+                INSERT INTO feedback (parent_name, student_name, message)
+                VALUES (${parentName}, ${studentName}, ${message})
+            `;
+        } else throw e;
+    }
+}
+
+export async function getAllFeedback(): Promise<any[]> {
+    const sql = getSQL();
+    try {
+        const rows = await sql`SELECT * FROM feedback ORDER BY created_at DESC`;
+        return rows;
+    } catch (e: any) {
+        if (e.message?.includes('relation "feedback" does not exist')) {
+            await initializeDatabase();
+            return [];
+        }
+        throw e;
+    }
+}
+
+export async function replyToFeedback(id: number, reply: string): Promise<boolean> {
+    const sql = getSQL();
+    const result = await sql`
+        UPDATE feedback
+        SET teacher_reply = ${reply}, replied_at = NOW()
+        WHERE id = ${id}
+        RETURNING id
+    `;
+    return result.length > 0;
+}
+
+export async function deleteFeedback(id: number): Promise<boolean> {
+    const sql = getSQL();
+    const result = await sql`
+        DELETE FROM feedback
+        WHERE id = ${id}
+        RETURNING id
+    `;
+    return result.length > 0;
 }
 
 // ---------- Helpers ----------

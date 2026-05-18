@@ -28,7 +28,7 @@ export default function TeacherDashboard() {
     const [topicDetails, setTopicDetails] = useState<any>(null);
     const [students, setStudents] = useState<any[]>([]);
     const [selectedStudent, setSelectedStudent] = useState('');
-    const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload'>('analysis');
+    const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload' | 'analytics'>('analysis');
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
     const [showPerformanceMatrix, setShowPerformanceMatrix] = useState(true);
 
@@ -60,6 +60,22 @@ export default function TeacherDashboard() {
     const [editTopicTotalMarks, setEditTopicTotalMarks] = useState('');
     const [editTopicSubject, setEditTopicSubject] = useState('');
     const [isSavingTopicDetails, setIsSavingTopicDetails] = useState(false);
+
+    // User Analytics state
+    const [analyticsStats, setAnalyticsStats] = useState<any>(null);
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
+    const [activePeriod, setActivePeriod] = useState<number | undefined>(7);
+    const [feedbackList, setFeedbackList] = useState<any[]>([]);
+    const [replyingToId, setReplyingToId] = useState<number | null>(null);
+    const [replyDraft, setReplyDraft] = useState('');
+    const [isSavingReply, setIsSavingReply] = useState(false);
+    const [analyticsFilterType, setAnalyticsFilterType] = useState<'days' | 'custom'>('days');
+    const [customDateFrom, setCustomDateFrom] = useState('');
+    const [customDateTo, setCustomDateTo] = useState('');
+    const [feedbackToDelete, setFeedbackToDelete] = useState<number | null>(null);
+
+    // Password masking state
+    const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
 
     const handleSaveTopicDetails = async () => {
         if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
@@ -214,11 +230,11 @@ export default function TeacherDashboard() {
             .then(data => {
                 if (Array.isArray(data)) {
                     const is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(selectedClass);
-                    const requiredSubjects = is11Or12 
+                    const requiredSubjects = is11Or12
                         ? ['Maths', 'Physics', 'Chemistry', 'Total']
                         : ['Maths', 'Physics', 'Chemistry', 'Biology'];
                     const merged = Array.from(new Set([...data, ...requiredSubjects]));
-                    
+
                     const sortOrder = requiredSubjects;
                     const sortedSubjects = merged.sort((a, b) => {
                         const idxA = sortOrder.indexOf(a);
@@ -228,7 +244,7 @@ export default function TeacherDashboard() {
                         if (idxB === -1) return -1;
                         return idxA - idxB;
                     });
-                    
+
                     setSubjects(sortedSubjects);
                     if (sortedSubjects.length > 0) setSelectedSubject(sortedSubjects[0]);
                 }
@@ -262,10 +278,62 @@ export default function TeacherDashboard() {
         }
     }, [selectedClass, refreshStudents]);
 
+    const fetchAnalytics = async (period?: number, fromDate?: string, toDate?: string) => {
+        setAnalyticsLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (period !== undefined) params.append('period', period.toString());
+            if (fromDate) params.append('from', fromDate);
+            if (toDate) params.append('to', toDate);
+
+            const url = `/api/analytics/stats?${params.toString()}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            setAnalyticsStats(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setAnalyticsLoading(false);
+        }
+    };
+
+    const fetchFeedback = async () => {
+        try {
+            const res = await fetch('/api/feedback');
+            const data = await res.json();
+            if (Array.isArray(data)) setFeedbackList(data);
+        } catch (e) { console.error(e); }
+    };
+
+    const executeDeleteFeedback = async () => {
+        if (!feedbackToDelete) return;
+        try {
+            const res = await fetch(`/api/feedback?id=${feedbackToDelete}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (result.success) {
+                toast.success('Feedback deleted');
+                fetchFeedback();
+            } else {
+                toast.error(result.error || 'Failed to delete feedback');
+            }
+        } catch {
+            toast.error('Error deleting feedback');
+        } finally {
+            setFeedbackToDelete(null);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'analytics') {
+            fetchAnalytics(activePeriod);
+            fetchFeedback();
+        }
+    }, [activeTab]);
+
     const handleAddStudent = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newStudentName.trim() || !selectedClass) return;
-        
+
         setIsAddingStudent(true);
         try {
             const res = await fetch('/api/admin/students', {
@@ -333,7 +401,7 @@ export default function TeacherDashboard() {
     const handleUploadMarks = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedClass || !selectedSubject || !uploadTopicName || !uploadTotalMarks) return;
-        
+
         setIsUploading(true);
         try {
             const payload = {
@@ -376,11 +444,11 @@ export default function TeacherDashboard() {
         const mean = validMarks.reduce((a, b) => a + b, 0) / validMarks.length;
         const variance = validMarks.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / validMarks.length;
         const sd = Math.sqrt(variance);
-        return { 
-            mean, 
-            sd, 
-            high: customHighCutoff !== null ? customHighCutoff : mean + sd, 
-            low: customLowCutoff !== null ? customLowCutoff : mean - sd 
+        return {
+            mean,
+            sd,
+            high: customHighCutoff !== null ? customHighCutoff : mean + sd,
+            low: customLowCutoff !== null ? customLowCutoff : mean - sd
         };
     };
 
@@ -395,7 +463,7 @@ export default function TeacherDashboard() {
     const pivotTableData = useMemo(() => {
         if (!batchData || batchData.length === 0) return [];
         const studentMap: Record<string, any> = {};
-        
+
         batchData.forEach(topic => {
             topic.students?.forEach((s: any) => {
                 if (!studentMap[s.name]) {
@@ -463,7 +531,7 @@ export default function TeacherDashboard() {
             const wb = xlsx.utils.book_new();
             xlsx.utils.book_append_sheet(wb, ws, "Marks");
             xlsx.writeFile(wb, `${selectedClass}_${selectedSubject}_${topic.topicName.replace(/\//g, '-')}.xlsx`);
-        } catch(e) { toast.error("Failed to download"); }
+        } catch (e) { toast.error("Failed to download"); }
     };
 
     const handleDownloadTemplate = () => {
@@ -478,7 +546,7 @@ export default function TeacherDashboard() {
             const wb = xlsx.utils.book_new();
             xlsx.utils.book_append_sheet(wb, ws, "Marks");
             xlsx.writeFile(wb, `${selectedClass}_${selectedSubject}_Template.xlsx`);
-        } catch(e) { toast.error("Failed to download"); }
+        } catch (e) { toast.error("Failed to download"); }
     };
 
     const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -568,80 +636,63 @@ export default function TeacherDashboard() {
 
                 {/* Tabs */}
                 <div className="tabs">
-                    <button
-                        onClick={() => setActiveTab('analysis')}
-                        className={`tab-btn ${activeTab === 'analysis' ? 'active' : ''}`}
-                    >
-                        Subject Analysis
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('students')}
-                        className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
-                    >
-                        Student Dashboard
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('manage')}
-                        className={`tab-btn ${activeTab === 'manage' ? 'active' : ''}`}
-                    >
-                        Class Manager
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('upload')}
-                        className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
-                    >
-                        Upload Marks
-                    </button>
+                    <button onClick={() => setActiveTab('analysis')} className={`tab-btn ${activeTab === 'analysis' ? 'active' : ''}`}>📈 Subject Analysis</button>
+                    <button onClick={() => setActiveTab('students')} className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}>🎓 Student Dashboard</button>
+                    <button onClick={() => setActiveTab('manage')} className={`tab-btn ${activeTab === 'manage' ? 'active' : ''}`}>👥 Class Manager</button>
+                    <button onClick={() => setActiveTab('upload')} className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}>📤 Upload Marks</button>
+                    <button onClick={() => setActiveTab('analytics')} className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}>📊 User Analytics</button>
                 </div>
 
-                {/* Controls - Common to both or just Analysis? Keeping common for now as student list depends on it currently */}
-                <div className="card" style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', alignItems: 'start' }}>
+                {/* Controls */}
+                {activeTab !== 'analytics' && (
+                    <div className="card" style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', alignItems: 'start' }}>
 
-                        {/* Class Select */}
-                        <div>
-                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Class</label>
-                            <select
-                                value={selectedClass}
-                                onChange={e => setSelectedClass(e.target.value)}
-                                style={{
-                                    width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem',
-                                    fontSize: '0.9rem', backgroundColor: '#f8fafc', cursor: 'pointer', outline: 'none'
-                                }}
-                            >
-                                {classes.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Subject Buttons */}
-                        {activeTab !== 'manage' && (
+                            {/* Class Select */}
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Subject</label>
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    {subjects.map(s => (
-                                        <button
-                                            key={s}
-                                            onClick={() => setSelectedSubject(s)}
-                                            style={{
-                                                padding: '0.5rem 1rem',
-                                                borderRadius: '0.5rem',
-                                                fontSize: '0.85rem',
-                                                fontWeight: 600,
-                                                border: selectedSubject === s ? 'none' : '1px solid #e2e8f0',
-                                                backgroundColor: selectedSubject === s ? (SUBJECT_COLORS[s as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS.default) : '#fff',
-                                                color: selectedSubject === s ? '#fff' : '#475569',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s',
-                                            }}
-                                        >
-                                            {s}
-                                        </button>
-                                    ))}
-                                </div>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Class</label>
+                                <select
+                                    value={selectedClass}
+                                    onChange={e => setSelectedClass(e.target.value)}
+                                    style={{
+                                        width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem',
+                                        fontSize: '0.9rem', backgroundColor: '#f8fafc', cursor: 'pointer', outline: 'none'
+                                    }}
+                                >
+                                    {classes.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
+                                </select>
                             </div>
-                        )}
+
+                            {/* Subject Buttons */}
+                            {activeTab !== 'manage' && (
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Subject</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                        {subjects.map(s => (
+                                            <button
+                                                key={s}
+                                                onClick={() => setSelectedSubject(s)}
+                                                style={{
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '0.5rem',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: 600,
+                                                    border: selectedSubject === s ? 'none' : '1px solid #e2e8f0',
+                                                    backgroundColor: selectedSubject === s ? (SUBJECT_COLORS[s as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS.default) : '#fff',
+                                                    color: selectedSubject === s ? '#fff' : '#475569',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                            >
+                                                {s}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {activeTab === 'analysis' && (
                     loading ? (
@@ -691,7 +742,7 @@ export default function TeacherDashboard() {
                             <div className="card" style={{ marginBottom: '1.5rem', overflow: 'hidden' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showPerformanceMatrix ? '1rem' : 0 }}>
                                     <h3 className="card-title" style={{ margin: 0 }}>Student Performance Overview</h3>
-                                    <button 
+                                    <button
                                         onClick={() => setShowPerformanceMatrix(!showPerformanceMatrix)}
                                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
                                     >
@@ -937,10 +988,10 @@ export default function TeacherDashboard() {
                                                             setShowCutoffModal(!showCutoffModal);
                                                         }}
                                                         style={{
-                                                            backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
+                                                            backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9',
                                                             border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
-                                                            borderRadius: '0.5rem', cursor: 'pointer', 
-                                                            color: showCutoffModal ? '#fff' : '#475569', 
+                                                            borderRadius: '0.5rem', cursor: 'pointer',
+                                                            color: showCutoffModal ? '#fff' : '#475569',
                                                             fontSize: '0.85rem', fontWeight: 600,
                                                             transition: 'all 0.2s'
                                                         }}
@@ -957,7 +1008,7 @@ export default function TeacherDashboard() {
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                 <div style={{ flex: 1 }}>
                                                     <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#166534' }}>Green (Greater than)</label>
-                                                    <input 
+                                                    <input
                                                         type="number" step="0.01" value={customHighCutoff ?? Number(highCutoff.toFixed(2))}
                                                         onChange={e => setCustomHighCutoff(e.target.value ? Number(e.target.value) : null)}
                                                         style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
@@ -965,7 +1016,7 @@ export default function TeacherDashboard() {
                                                 </div>
                                                 <div style={{ flex: 1 }}>
                                                     <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#991b1b' }}>Red (Less than)</label>
-                                                    <input 
+                                                    <input
                                                         type="number" step="0.01" value={customLowCutoff ?? Number(lowCutoff.toFixed(2))}
                                                         onChange={e => setCustomLowCutoff(e.target.value ? Number(e.target.value) : null)}
                                                         style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
@@ -973,7 +1024,7 @@ export default function TeacherDashboard() {
                                                 </div>
                                             </div>
                                             <div>
-                                                <button 
+                                                <button
                                                     onClick={() => { setCustomHighCutoff(null); setCustomLowCutoff(null); }}
                                                     style={{ padding: '0.4rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.25rem', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.85rem' }}
                                                 >
@@ -999,7 +1050,7 @@ export default function TeacherDashboard() {
                                                 {tableData.sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999)).map((student: any, idx: number) => (
                                                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
                                                         <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 'bold', color: '#7c3aed' }}>#{student.rank}</td>
-                                                        <td 
+                                                        <td
                                                             style={{ padding: '0.75rem', fontWeight: 500, color: '#7c3aed', cursor: 'pointer', textDecoration: 'underline' }}
                                                             onClick={() => {
                                                                 setSelectedStudent(student.name);
@@ -1084,8 +1135,8 @@ export default function TeacherDashboard() {
 
                         {selectedStudent ? (
                             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                                <StudentDashboardView 
-                                    studentName={selectedStudent} 
+                                <StudentDashboardView
+                                    studentName={selectedStudent}
                                     externalActiveSubject={selectedSubject}
                                     onSubjectChange={setSelectedSubject}
                                     onPerformanceUpdated={refreshBatchData}
@@ -1112,7 +1163,7 @@ export default function TeacherDashboard() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h3 className="card-title" style={{ margin: 0 }}>Manage Students for: {selectedClass ? selectedClass.replace(/_/g, ' ') : 'None'}</h3>
                         </div>
-                        
+
                         <form onSubmit={handleAddStudent} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
                             <div style={{ flex: 1 }}>
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Add New Student Name</label>
@@ -1128,8 +1179,8 @@ export default function TeacherDashboard() {
                                     required
                                 />
                             </div>
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={isAddingStudent || !newStudentName.trim()}
                                 style={{
                                     padding: '0.6rem 1.5rem', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '0.5rem',
@@ -1161,10 +1212,10 @@ export default function TeacherDashboard() {
                                                     <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{student.rollNo || '-'}</td>
                                                     <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
                                                         {editingStudentName === student.username ? (
-                                                            <input 
-                                                                type="text" 
-                                                                value={editedStudentNameValue} 
-                                                                onChange={e => setEditedStudentNameValue(e.target.value)} 
+                                                            <input
+                                                                type="text"
+                                                                value={editedStudentNameValue}
+                                                                onChange={e => setEditedStudentNameValue(e.target.value)}
                                                                 placeholder="Name"
                                                                 style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
                                                             />
@@ -1174,10 +1225,10 @@ export default function TeacherDashboard() {
                                                     </td>
                                                     <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
                                                         {editingStudentName === student.username ? (
-                                                            <input 
-                                                                type="text" 
-                                                                value={editedStudentEmailValue} 
-                                                                onChange={e => setEditedStudentEmailValue(e.target.value)} 
+                                                            <input
+                                                                type="text"
+                                                                value={editedStudentEmailValue}
+                                                                onChange={e => setEditedStudentEmailValue(e.target.value)}
                                                                 placeholder="Email"
                                                                 style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
                                                             />
@@ -1187,21 +1238,46 @@ export default function TeacherDashboard() {
                                                     </td>
                                                     <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
                                                         {editingStudentName === student.username ? (
-                                                            <input 
-                                                                type="text" 
-                                                                value={editedStudentPasswordValue} 
-                                                                onChange={e => setEditedStudentPasswordValue(e.target.value)} 
+                                                            <input
+                                                                type="text"
+                                                                value={editedStudentPasswordValue}
+                                                                onChange={e => setEditedStudentPasswordValue(e.target.value)}
                                                                 placeholder="Password"
                                                                 style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
                                                             />
                                                         ) : (
-                                                            student.password || '******'
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <span style={{ fontFamily: 'monospace', letterSpacing: '0.1em', color: revealedPasswords.has(student.username) ? '#334155' : '#94a3b8' }}>
+                                                                    {revealedPasswords.has(student.username) ? (student.password || '—') : '••••••'}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setRevealedPasswords(prev => {
+                                                                        const next = new Set(prev);
+                                                                        if (next.has(student.username)) next.delete(student.username);
+                                                                        else next.add(student.username);
+                                                                        return next;
+                                                                    })}
+                                                                    title={revealedPasswords.has(student.username) ? 'Hide password' : 'Show password'}
+                                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                                                                >
+                                                                    {revealedPasswords.has(student.username) ? (
+                                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                                                                        </svg>
+                                                                    )}
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </td>
                                                     <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                                                         {editingStudentName === student.username ? (
                                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                                <button 
+                                                                <button
                                                                     onClick={async () => {
                                                                         if (!editedStudentNameValue.trim()) {
                                                                             setEditingStudentName(null);
@@ -1239,20 +1315,20 @@ export default function TeacherDashboard() {
                                                                     style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
                                                                     title="Save"
                                                                 >
-                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     onClick={() => setEditingStudentName(null)}
                                                                     disabled={isManagingStudentAction}
                                                                     style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', outline: 'none' }}
                                                                     title="Cancel"
                                                                 >
-                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                                                                 </button>
                                                             </div>
                                                         ) : (
                                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                                <button 
+                                                                <button
                                                                     onClick={() => {
                                                                         setEditingStudentName(student.username);
                                                                         setEditedStudentNameValue(student.username);
@@ -1264,12 +1340,12 @@ export default function TeacherDashboard() {
                                                                 >
                                                                     <Edit2 size={16} />
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleDeleteStudent(student.username)}
                                                                     style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
                                                                     title="Delete Student"
                                                                 >
-                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" /></svg>
                                                                 </button>
                                                             </div>
                                                         )}
@@ -1303,14 +1379,14 @@ export default function TeacherDashboard() {
                                                     <td style={{ padding: '0.75rem 1rem', color: '#991b1b', textDecoration: 'line-through' }}>{student.username}</td>
                                                     <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleRestoreStudent(student.username)}
                                                                 style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
                                                                 title="Restore Student"
                                                             >
-                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10h10a5 5 0 015 5v2M3 10l6 6m-6-6l6-6"/></svg>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10h10a5 5 0 015 5v2M3 10l6 6m-6-6l6-6" /></svg>
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={async () => {
                                                                     if (!window.confirm(`Are you sure you want to PERMANENTLY delete ${student.username}? This cannot be undone.`)) return;
                                                                     try {
@@ -1334,7 +1410,7 @@ export default function TeacherDashboard() {
                                                                 style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
                                                                 title="Permanently Delete Student"
                                                             >
-                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" /></svg>
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1345,11 +1421,11 @@ export default function TeacherDashboard() {
                                 </div>
                             </div>
                         )}
-                    <hr style={{ border: 'none', borderTop: '2px solid #e2e8f0', margin: '2rem 0' }} />
+                        <hr style={{ border: 'none', borderTop: '2px solid #e2e8f0', margin: '2rem 0' }} />
 
                         <div id='manage-classes-section' style={{ marginBottom: '2rem' }}>
                             <h3 className="card-title" style={{ marginBottom: '1rem' }}>Manage Classes</h3>
-                            
+
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '1.5rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Add New Class Name</label>
@@ -1381,7 +1457,7 @@ export default function TeacherDashboard() {
                                     + Add Class
                                 </button>
                             </div>
-                            
+
                             <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
                                 <table className="data-table" style={{ width: '100%', backgroundColor: '#fff' }}>
                                     <thead>
@@ -1395,10 +1471,10 @@ export default function TeacherDashboard() {
                                             <tr key={cls} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 !== 0 ? '#f8fafc' : '#ffffff' }}>
                                                 <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
                                                     {editingClass === cls ? (
-                                                        <input 
-                                                            type="text" 
-                                                            value={editedClassName} 
-                                                            onChange={e => setEditedClassName(e.target.value)} 
+                                                        <input
+                                                            type="text"
+                                                            value={editedClassName}
+                                                            onChange={e => setEditedClassName(e.target.value)}
                                                             style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
                                                         />
                                                     ) : (
@@ -1408,7 +1484,7 @@ export default function TeacherDashboard() {
                                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                                                     {editingClass === cls ? (
                                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                            <button 
+                                                            <button
                                                                 onClick={async () => {
                                                                     if (!editedClassName.trim() || editedClassName === cls.replace('Class_', '')) {
                                                                         setEditingClass(null);
@@ -1440,20 +1516,20 @@ export default function TeacherDashboard() {
                                                                 style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', outline: 'none' }}
                                                                 title="Save"
                                                             >
-                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => setEditingClass(null)}
                                                                 disabled={isManagingClassAction}
                                                                 style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', outline: 'none' }}
                                                                 title="Cancel"
                                                             >
-                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                                                             </button>
                                                         </div>
                                                     ) : (
                                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => {
                                                                     setEditingClass(cls);
                                                                     setEditedClassName(cls.replace('Class_', ''));
@@ -1463,7 +1539,7 @@ export default function TeacherDashboard() {
                                                             >
                                                                 <Edit2 size={16} />
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={async () => {
                                                                     if (!window.confirm(`Are you sure you want to PERMANENTLY delete class "${cls.replace('Class_', '')}" and ALL its data?`)) return;
                                                                     setIsManagingClassAction(true);
@@ -1490,7 +1566,7 @@ export default function TeacherDashboard() {
                                                                 style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', outline: 'none' }}
                                                                 title="Delete Class"
                                                             >
-                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" /></svg>
                                                             </button>
                                                         </div>
                                                     )}
@@ -1502,9 +1578,9 @@ export default function TeacherDashboard() {
                             </div>
                         </div>
 
-                        </div>
+                    </div>
                 )}
-{activeTab === 'upload' && (
+                {activeTab === 'upload' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                             <h3 className="card-title" style={{ margin: 0 }}>Upload Marks: {selectedClass.replace(/_/g, ' ')} - {selectedSubject}</h3>
@@ -1533,10 +1609,10 @@ export default function TeacherDashboard() {
                                         setCustomHighCutoff(uploadHighCutoff !== null ? Number(uploadHighCutoff.toFixed(2)) : null);
                                         setCustomLowCutoff(uploadLowCutoff !== null ? Number(uploadLowCutoff.toFixed(2)) : null);
                                         setShowCutoffModal(!showCutoffModal);
-                                        
+
                                         // Sort Table by Marks descending
                                         if (!showCutoffModal) {
-                                            setUploadStudents(prev => [...prev].sort((a,b) => {
+                                            setUploadStudents(prev => [...prev].sort((a, b) => {
                                                 const m1 = Number(a.marks);
                                                 const m2 = Number(b.marks);
                                                 if ((isNaN(m1) || a.marks === '') && (isNaN(m2) || b.marks === '')) return 0;
@@ -1547,10 +1623,10 @@ export default function TeacherDashboard() {
                                         }
                                     }}
                                     style={{
-                                        backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9', 
+                                        backgroundColor: showCutoffModal ? '#7c3aed' : '#f1f5f9',
                                         border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
-                                        borderRadius: '0.5rem', cursor: 'pointer', 
-                                        color: showCutoffModal ? '#fff' : '#475569', 
+                                        borderRadius: '0.5rem', cursor: 'pointer',
+                                        color: showCutoffModal ? '#fff' : '#475569',
                                         fontSize: '0.85rem', fontWeight: 600,
                                         transition: 'all 0.2s'
                                     }}
@@ -1565,7 +1641,7 @@ export default function TeacherDashboard() {
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                     <div style={{ flex: 1 }}>
                                         <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#166534' }}>Green (Greater than)</label>
-                                        <input 
+                                        <input
                                             type="number" step="0.01" value={customHighCutoff ?? Number(uploadHighCutoff.toFixed(2))}
                                             onChange={e => setCustomHighCutoff(e.target.value ? Number(e.target.value) : null)}
                                             style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
@@ -1573,7 +1649,7 @@ export default function TeacherDashboard() {
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: 600, color: '#991b1b' }}>Red (Less than)</label>
-                                        <input 
+                                        <input
                                             type="number" step="0.01" value={customLowCutoff ?? Number(uploadLowCutoff.toFixed(2))}
                                             onChange={e => setCustomLowCutoff(e.target.value ? Number(e.target.value) : null)}
                                             style={{ width: '100%', padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', fontSize: '0.9rem' }}
@@ -1581,7 +1657,7 @@ export default function TeacherDashboard() {
                                     </div>
                                 </div>
                                 <div>
-                                    <button 
+                                    <button
                                         onClick={() => { setCustomHighCutoff(null); setCustomLowCutoff(null); }}
                                         style={{ padding: '0.4rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.25rem', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.85rem' }}
                                     >
@@ -1590,14 +1666,14 @@ export default function TeacherDashboard() {
                                 </div>
                             </div>
                         )}
-                        
+
                         <form onSubmit={handleUploadMarks}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Topic Name</label>
-                                    <input 
-                                        type="text" 
-                                        value={uploadTopicName} 
+                                    <input
+                                        type="text"
+                                        value={uploadTopicName}
                                         onChange={e => setUploadTopicName(e.target.value)}
                                         placeholder="e.g. Chapter 1 Test"
                                         required
@@ -1606,9 +1682,9 @@ export default function TeacherDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Date</label>
-                                    <input 
-                                        type="date" 
-                                        value={uploadDate} 
+                                    <input
+                                        type="date"
+                                        value={uploadDate}
                                         onChange={e => setUploadDate(e.target.value)}
                                         required
                                         style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
@@ -1616,11 +1692,11 @@ export default function TeacherDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Total Marks</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         min="0.1"
                                         step="0.1"
-                                        value={uploadTotalMarks} 
+                                        value={uploadTotalMarks}
                                         onChange={e => setUploadTotalMarks(e.target.value)}
                                         required
                                         style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
@@ -1645,8 +1721,8 @@ export default function TeacherDashboard() {
                                                     {student.name}
                                                 </td>
                                                 <td style={{ padding: '0.75rem' }}>
-                                                    <input 
-                                                        type="number" 
+                                                    <input
+                                                        type="number"
                                                         step="0.1"
                                                         value={student.marks}
                                                         onChange={e => {
@@ -1658,8 +1734,8 @@ export default function TeacherDashboard() {
                                                     />
                                                 </td>
                                                 <td style={{ padding: '0.75rem' }}>
-                                                    <input 
-                                                        type="text" 
+                                                    <input
+                                                        type="text"
                                                         value={student.comments}
                                                         onChange={e => {
                                                             const newStudents = [...uploadStudents];
@@ -1700,6 +1776,307 @@ export default function TeacherDashboard() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                )}
+
+                {/* ── USER ANALYTICS TAB ── */}
+                {activeTab === 'analytics' && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        {/* Global Date Filter */}
+                        <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Date Range:</label>
+                                <select
+                                    value={analyticsFilterType === 'days' ? (activePeriod ?? '') : 'custom'}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (val === 'custom') {
+                                            setAnalyticsFilterType('custom');
+                                        } else {
+                                            setAnalyticsFilterType('days');
+                                            const v = val === '' ? undefined : Number(val);
+                                            setActivePeriod(v);
+                                            fetchAnalytics(v, undefined, undefined);
+                                        }
+                                    }}
+                                    style={{ fontSize: '0.85rem', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '0.4rem 0.5rem', outline: 'none', cursor: 'pointer', color: '#334155' }}
+                                >
+                                    <option value="7">Last 7 days</option>
+                                    <option value="30">Last 30 days</option>
+                                    <option value="90">Last 90 days</option>
+                                    <option value="">All time</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                            </div>
+
+                            {analyticsFilterType === 'custom' && (
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <input
+                                        type="date"
+                                        value={customDateFrom}
+                                        onChange={e => setCustomDateFrom(e.target.value)}
+                                        style={{ fontSize: '0.85rem', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', outline: 'none', color: '#334155' }}
+                                    />
+                                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>to</span>
+                                    <input
+                                        type="date"
+                                        value={customDateTo}
+                                        onChange={e => setCustomDateTo(e.target.value)}
+                                        style={{ fontSize: '0.85rem', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', outline: 'none', color: '#334155' }}
+                                    />
+                                    <button
+                                        onClick={() => fetchAnalytics(undefined, customDateFrom, customDateTo)}
+                                        disabled={!customDateFrom || !customDateTo}
+                                        style={{ background: (!customDateFrom || !customDateTo) ? '#94a3b8' : '#10b981', color: '#fff', border: 'none', borderRadius: '0.4rem', padding: '0.45rem 1.25rem', fontSize: '0.85rem', cursor: (!customDateFrom || !customDateTo) ? 'not-allowed' : 'pointer', fontWeight: 600, transition: 'background 0.2s' }}
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {analyticsLoading ? (
+                            <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Loading analytics…</div>
+                        ) : (
+                            <>
+                                {/* KPI Cards */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                                    <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #1a365d' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Logins Today</p>
+                                        <p style={{ fontSize: '2rem', fontWeight: 700, color: '#1a365d', margin: 0 }}>{analyticsStats?.todayLogins ?? '—'}</p>
+                                    </div>
+                                    <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #7c3aed' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                            <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, margin: 0 }}>Logged in Users in Time Range</p>
+                                        </div>
+                                        <p style={{ fontSize: '2rem', fontWeight: 700, color: '#7c3aed', margin: 0 }}>{analyticsStats?.activeUsers ?? '—'}</p>
+                                    </div>
+                                    <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Total Users</p>
+                                        <p style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981', margin: 0 }}>{analyticsStats?.totalUsers ?? '—'}</p>
+                                    </div>
+                                    <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #f59e0b' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginBottom: '0.25rem' }}>Mobile Users %</p>
+                                        <p style={{ fontSize: '2rem', fontWeight: 700, color: '#f59e0b', margin: 0 }}>
+                                            {analyticsStats?.deviceBreakdown?.length
+                                                ? (() => {
+                                                    const total = analyticsStats.deviceBreakdown.reduce((a: number, d: any) => a + Number(d.count), 0);
+                                                    const mobile = Number(analyticsStats.deviceBreakdown.find((d: any) => d.device_type === 'Mobile')?.count ?? 0);
+                                                    return total > 0 ? `${Math.round((mobile / total) * 100)}%` : '0%';
+                                                })()
+                                                : '—'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Charts row */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                    <div className="card">
+                                        <h3 className="card-title" style={{ marginBottom: '1rem' }}>Device Breakdown</h3>
+                                        {analyticsStats?.deviceBreakdown?.length > 0 ? (
+                                            <div style={{ height: 200 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={analyticsStats.deviceBreakdown.map((d: any) => ({ name: d.device_type, Logins: Number(d.count) }))} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                                        <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }} />
+                                                        <Bar dataKey="Logins" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        ) : <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem 0' }}>No data yet</p>}
+                                    </div>
+                                    <div className="card">
+                                        <h3 className="card-title" style={{ marginBottom: '1rem' }}>Browser Distribution</h3>
+                                        {analyticsStats?.browserBreakdown?.length > 0 ? (
+                                            <div style={{ height: 200 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={analyticsStats.browserBreakdown.map((d: any) => ({ name: d.browser, Logins: Number(d.count) }))} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                                        <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }} />
+                                                        <Bar dataKey="Logins" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        ) : <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem 0' }}>No data yet</p>}
+                                    </div>
+                                </div>
+
+                                {/* Login Trend */}
+                                <div className="card" style={{ marginBottom: '1.5rem' }}>
+                                    <h3 className="card-title" style={{ marginBottom: '1rem' }}>Login Trend (Last 30 Days)</h3>
+                                    {analyticsStats?.loginTrend?.length > 0 ? (
+                                        <div style={{ height: 220 }}>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart
+                                                    data={analyticsStats.loginTrend.map((d: any) => ({ date: new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), Logins: Number(d.count) }))}
+                                                    margin={{ top: 10, right: 20, left: 0, bottom: 30 }}
+                                                >
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b', dy: 12 }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} angle={-35} textAnchor="end" />
+                                                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} allowDecimals={false} />
+                                                    <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.85rem' }} />
+                                                    <Line type="monotone" dataKey="Logins" stroke="#1a365d" strokeWidth={3} dot={{ r: 4, fill: '#1a365d' }} activeDot={{ r: 6 }} />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    ) : <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem 0' }}>No login data in the last 30 days</p>}
+                                </div>
+
+                                {/* Feedback Section */}
+                                <div className="card" style={{ marginBottom: '1.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                        <h3 className="card-title" style={{ margin: 0 }}>Parent Feedback</h3>
+                                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{feedbackList.length} submission{feedbackList.length !== 1 ? 's' : ''}</span>
+                                    </div>
+                                    {feedbackList.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', border: '2px dashed #f1f5f9', borderRadius: '0.5rem' }}>No feedback submitted yet.</div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            {feedbackList.map((fb: any) => (
+                                                <div key={fb.id} style={{ border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '1.25rem', backgroundColor: '#fafafa' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                        <div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>{fb.parent_name || 'Anonymous'}</span>
+                                                                {fb.student_name && (
+                                                                    <span style={{ fontSize: '0.8rem', color: '#7c3aed', backgroundColor: '#f3f0ff', padding: '0.15rem 0.5rem', borderRadius: '1rem', fontWeight: 600 }}>
+                                                                        👤 {fb.student_name}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                                                                {new Date(fb.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setFeedbackToDelete(fb.id)}
+                                                            style={{ padding: '0.3rem 0.6rem', border: '1px solid #fee2e2', borderRadius: '0.4rem', background: '#fef2f2', color: '#ef4444', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                                            title="Delete feedback"
+                                                        >
+                                                            🗑️ Delete
+                                                        </button>
+                                                    </div>
+                                                    <p style={{ margin: '0 0 0.75rem', color: '#334155', fontSize: '0.9rem', lineHeight: 1.6 }}>{fb.message}</p>
+                                                    {fb.teacher_reply ? (
+                                                        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '0.75rem 1rem' }}>
+                                                            <p style={{ margin: '0 0 0.25rem', fontSize: '0.8rem', fontWeight: 700, color: '#166534' }}>✅ Teacher Reply</p>
+                                                            <p style={{ margin: 0, fontSize: '0.88rem', color: '#166534' }}>{fb.teacher_reply}</p>
+                                                        </div>
+                                                    ) : replyingToId === fb.id ? (
+                                                        <div style={{ marginTop: '0.75rem' }}>
+                                                            <textarea
+                                                                value={replyDraft}
+                                                                onChange={e => setReplyDraft(e.target.value)}
+                                                                placeholder="Type your reply..."
+                                                                rows={3}
+                                                                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1.5px solid #7c3aed', borderRadius: '0.5rem', fontSize: '0.9rem', outline: 'none', fontFamily: 'Inter, sans-serif', resize: 'vertical', boxSizing: 'border-box' }}
+                                                            />
+                                                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                <button onClick={() => { setReplyingToId(null); setReplyDraft(''); }} style={{ padding: '0.4rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.4rem', background: '#fff', cursor: 'pointer', color: '#64748b', fontSize: '0.85rem' }}>Cancel</button>
+                                                                <button
+                                                                    disabled={isSavingReply || !replyDraft.trim()}
+                                                                    onClick={async () => {
+                                                                        if (!replyDraft.trim()) return;
+                                                                        setIsSavingReply(true);
+                                                                        try {
+                                                                            const res = await fetch('/api/feedback', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: fb.id, reply: replyDraft.trim() }) });
+                                                                            const result = await res.json();
+                                                                            if (result.success) { toast.success('Reply saved'); setReplyingToId(null); setReplyDraft(''); await fetchFeedback(); }
+                                                                            else toast.error('Failed to save reply');
+                                                                        } catch { toast.error('Error saving reply'); }
+                                                                        finally { setIsSavingReply(false); }
+                                                                    }}
+                                                                    style={{ padding: '0.4rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '0.4rem', cursor: isSavingReply || !replyDraft.trim() ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: isSavingReply || !replyDraft.trim() ? 0.6 : 1 }}
+                                                                >
+                                                                    {isSavingReply ? 'Saving…' : 'Send Reply'}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => { setReplyingToId(fb.id); setReplyDraft(''); }}
+                                                            style={{ marginTop: '0.5rem', padding: '0.35rem 0.85rem', border: '1px solid #e2e8f0', borderRadius: '0.4rem', background: '#fff', color: '#7c3aed', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+                                                        >
+                                                            💬 Reply
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Last Login Table */}
+                                <div className="card">
+                                    <h3 className="card-title" style={{ marginBottom: '1rem' }}>Student Last Logins</h3>
+                                    {analyticsStats?.lastLogins?.length > 0 ? (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table className="data-table" style={{ width: '100%' }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b' }}>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Username</th>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Name</th>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Device</th>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Browser</th>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>OS</th>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Last Login</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {analyticsStats.lastLogins.map((u: any, idx: number) => (
+                                                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                                            <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#1e293b', fontSize: '0.88rem' }}>{u.username}</td>
+                                                            <td style={{ padding: '0.75rem 1rem', color: '#334155', fontSize: '0.88rem' }}>{u.name || '—'}</td>
+                                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                                                                {u.device_type === 'Mobile' ? '📱' : u.device_type === 'Tablet' ? '📟' : '🖥️'} {u.device_type || '—'}
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>{u.browser || '—'}</td>
+                                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>{u.os || '—'}</td>
+                                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#94a3b8', fontSize: '0.82rem' }}>
+                                                                {new Date(u.login_time).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', border: '2px dashed #f1f5f9', borderRadius: '0.5rem' }}>
+                                            No login records yet. Records appear after users log in.
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* ── DELETE FEEDBACK MODAL ── */}
+                {feedbackToDelete !== null && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                        <div style={{ background: '#fff', padding: '2rem', borderRadius: '1rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                <div style={{ background: '#fee2e2', color: '#ef4444', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>Delete Feedback</h3>
+                            </div>
+                            <p style={{ color: '#475569', fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                                Are you sure you want to delete this feedback? This action cannot be undone.
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                                <button onClick={() => setFeedbackToDelete(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>
+                                    Cancel
+                                </button>
+                                <button onClick={executeDeleteFeedback} style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '0.5rem', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>
