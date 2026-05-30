@@ -1099,7 +1099,7 @@ export default function TeacherDashboard() {
                                 No performance data found for <strong>{selectedSubject}</strong> in <strong>{selectedClass.replace(/_/g, ' ')}</strong>.
                             </p>
                             <p style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                                Add an Excel file at Data/{selectedClass}/{selectedSubject}.xlsx
+                                Please upload an Excel file using the Upload Marks tab.
                             </p>
                         </div>
                     ) : (

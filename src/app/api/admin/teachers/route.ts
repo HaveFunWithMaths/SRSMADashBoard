@@ -14,21 +14,8 @@ import {
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     
-    // Add debugging log to a file
-    const fs = require('fs');
-    const path = require('path');
-    const logDir = path.join(process.cwd(), '.tmp');
-    if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-    }
-    const logPath = path.join(logDir, 'teachers-api-debug.log');
-    const logMsg = `[${new Date().toISOString()}] GET request. Session: ${JSON.stringify(session)}\n`;
-    fs.appendFileSync(logPath, logMsg);
-
     console.log("Teachers API GET Session:", session);
     if (!session || (session.user.role !== 'admin' && session.user.name?.toLowerCase() !== 'srsma' && session.user.username?.toLowerCase() !== 'srsma')) {
-        const authErrorMsg = `[${new Date().toISOString()}] GET: Unauthorized access attempt. Session User: ${JSON.stringify(session?.user)}\n`;
-        fs.appendFileSync(logPath, authErrorMsg);
         console.log("Teachers API GET: Unauthorized access attempt.", session?.user);
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -36,8 +23,6 @@ export async function GET(req: Request) {
     try {
         const teachers = await getAllTeachers();
         const mappings = await getTeacherMappings();
-        const successMsg = `[${new Date().toISOString()}] GET: Success. Found ${teachers.length} teachers and ${mappings.length} mappings.\n`;
-        fs.appendFileSync(logPath, successMsg);
         return NextResponse.json({
             teachers: teachers.map(t => ({
                 id: t.id,
@@ -49,8 +34,6 @@ export async function GET(req: Request) {
             mappings
         });
     } catch (e: any) {
-        const errorMsg = `[${new Date().toISOString()}] GET Error: ${e.message}\nStack: ${e.stack}\n`;
-        fs.appendFileSync(logPath, errorMsg);
         console.error('Error fetching teacher data:', e);
         return NextResponse.json({ error: e.message || 'Failed to fetch data' }, { status: 500 });
     }
