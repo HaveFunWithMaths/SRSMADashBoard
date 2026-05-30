@@ -31,14 +31,15 @@ async function seed() {
     await sql`
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
+            name VARCHAR(255) NOT NULL,
             password VARCHAR(255) NOT NULL DEFAULT 'srsma',
             class VARCHAR(50),
             role VARCHAR(20) NOT NULL DEFAULT 'Student',
-            roll_no VARCHAR(50),
+            username VARCHAR(50),
             status VARCHAR(20) NOT NULL DEFAULT 'Active',
+            email VARCHAR(255),
             created_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(username, class)
+            UNIQUE(name, class)
         )
     `;
     console.log('   ✅ Table created (or already exists).\n');
@@ -68,8 +69,12 @@ async function seed() {
         const password = String(user.password || user.Password || 'srsma').trim();
         const userClass = user.class != null ? String(user.class).trim() : null;
         const role = String(user.Role || user.role || 'Student').trim();
-        const rollNo = String(user['Roll No'] || user.rollNo || user.RollNo || '').trim() || null;
+        let rollNo = String(user['Roll No'] || user.rollNo || user.RollNo || '').trim() || null;
         const status = String(user.Status || 'Active').trim();
+
+        if (role.toLowerCase() === 'teacher' || role.toLowerCase() === 'admin' || !rollNo) {
+            rollNo = username;
+        }
 
         if (!username) {
             console.log(`   ⚠️  Skipping row with empty username`);
@@ -79,12 +84,12 @@ async function seed() {
 
         try {
             await sql`
-                INSERT INTO users (username, password, class, role, roll_no, status)
+                INSERT INTO users (name, password, class, role, username, status)
                 VALUES (${username}, ${password}, ${userClass}, ${role}, ${rollNo}, ${status})
-                ON CONFLICT (username, class) DO UPDATE SET
+                ON CONFLICT (name, class) DO UPDATE SET
                     password = EXCLUDED.password,
                     role = EXCLUDED.role,
-                    roll_no = EXCLUDED.roll_no,
+                    username = EXCLUDED.username,
                     status = EXCLUDED.status
             `;
             inserted++;
