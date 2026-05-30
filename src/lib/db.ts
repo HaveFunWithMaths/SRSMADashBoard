@@ -728,12 +728,25 @@ export interface TeacherMapping {
 
 export async function getAllTeachers(): Promise<DBUser[]> {
     const sql = getSQL();
-    const rows = await sql`
-        SELECT * FROM users
-        WHERE LOWER(role) = 'teacher'
-        ORDER BY name
-    `;
-    return rows as DBUser[];
+    try {
+        const rows = await sql`
+            SELECT * FROM users
+            WHERE LOWER(role) = 'teacher'
+            ORDER BY name
+        `;
+        return rows as DBUser[];
+    } catch (e: any) {
+        if (e.message?.includes('relation "users" does not exist')) {
+            await initializeDatabase();
+            const rows = await sql`
+                SELECT * FROM users
+                WHERE LOWER(role) = 'teacher'
+                ORDER BY name
+            `;
+            return rows as DBUser[];
+        }
+        throw e;
+    }
 }
 
 export async function addTeacher(name: string, password: string): Promise<void> {
@@ -819,11 +832,23 @@ export async function deleteTeacher(name: string): Promise<boolean> {
 
 export async function getTeacherMappings(): Promise<TeacherMapping[]> {
     const sql = getSQL();
-    const rows = await sql`
-        SELECT * FROM teacher_mappings
-        ORDER BY teacher_username, class_name, subject
-    `;
-    return rows as TeacherMapping[];
+    try {
+        const rows = await sql`
+            SELECT * FROM teacher_mappings
+            ORDER BY teacher_username, class_name, subject
+        `;
+        return rows as TeacherMapping[];
+    } catch (e: any) {
+        if (e.message?.includes('relation "teacher_mappings" does not exist')) {
+            await initializeDatabase();
+            const rows = await sql`
+                SELECT * FROM teacher_mappings
+                ORDER BY teacher_username, class_name, subject
+            `;
+            return rows as TeacherMapping[];
+        }
+        throw e;
+    }
 }
 
 export async function getMappingsForTeacher(teacherUsername: string): Promise<TeacherMapping[]> {
