@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getAllDataFromDB, getStudentDataFromDB, getUsersFromDB } from "@/lib/parser";
-import { getAllClasses } from "@/lib/db";
+import { getAllClasses, getMappingsForTeacher } from "@/lib/db";
 
 /**
  * Maps a raw Excel class value (e.g. "12+", 12, "XII") to a folder-style name (e.g. "Class_12+", "Class_XII").
@@ -42,15 +42,20 @@ export async function GET(request: Request) {
             try {
                 loginClasses = await getAllClasses();
             } catch (err) {
-                console.error('DB class lookup failed, falling back to Excel:', err);
-                const users = await getUsersFromDB();
-                loginClasses = [...new Set(
-                    users.filter(u => u.class).map(u => excelClassToFolderName(u.class))
-                )];
+                console.error('DB class lookup failed:', err);
             }
 
             // Merge both sources, deduplicate
-            const merged = [...new Set([...folderClasses, ...loginClasses])];
+            let merged = [...new Set([...folderClasses, ...loginClasses])];
+
+            // If user is a regular teacher, restrict to classes they teach
+            const isRegularTeacher = session.user.role === 'teacher' && session.user.name?.toLowerCase() !== 'srsma';
+            if (isRegularTeacher) {
+                const mappings = await getMappingsForTeacher(session.user.username || '');
+                const teacherClasses = new Set(mappings.map(m => m.class_name));
+                merged = merged.filter(c => teacherClasses.has(c));
+            }
+
             return NextResponse.json(merged);
         }
 
@@ -104,6 +109,16 @@ export async function GET(request: Request) {
             }
 
             return NextResponse.json(result);
+        }
+
+        // 5. Get Teacher Permissions
+        if (type === 'teacher-permissions') {
+            const isRegularTeacher = session.user.role === 'teacher' && session.user.name?.toLowerCase() !== 'srsma';
+            if (!isRegularTeacher) {
+                return NextResponse.json({ isAdmin: true, permissions: [] });
+            }
+            const mappings = await getMappingsForTeacher(session.user.username || '');
+            return NextResponse.json({ isAdmin: false, permissions: mappings });
         }
 
         return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });

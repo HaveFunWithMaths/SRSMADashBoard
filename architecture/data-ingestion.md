@@ -1,39 +1,34 @@
 # Data Ingestion SOP
 
 ## Overview
-The system ingests data from local Excel files mimicking a potential Google Drive structure. The "Source of Truth" is the `Data/` directory.
+The primary "Source of Truth" is the PostgreSQL database. All performance logs, classes, subjects, and topics are read and written directly to the database. Local file system reads (`Data/` directory) are deprecated.
 
-## File Structure
-- **Root**: `Data/`
-- **Class Folder**: `{ClassName}/` (e.g., `Class_XI`)
-- **Subject File**: `{SubjectName}.xlsx` (e.g., `Maths.xlsx`)
-- **Tabs**: Each tab represents a specific **Topic**.
+To ingest new performance data, teachers upload Excel files via the "Upload Marks" tab. The system parses these uploads, validates their schemas, and saves the data directly to the database.
 
-## Schema Validation
-Before processing, every sheet must be validated against the following rules:
+## Excel Import Validation Rules
+When an Excel file is uploaded for a specific Class and Subject, the first sheet is parsed and validated against the following structure:
 
-### Row 1 (Header 1)
+### Row 1 (Header Metadata)
 - **Cell A1**: Must be strictly `"Date"`.
-- **Cell B1**: Contains the date value (datetime).
+- **Cell B1**: Contains the test date value.
 - **Cell C1**: Must be strictly `"Total Marks"`.
-- **Cell D1**: Contains the integer value of total marks.
+- **Cell D1**: Contains the numeric value of total marks for the test.
 
-### Row 2 (Header 2)
+### Row 2 (Column Headers)
 - **Cell A2**: Must be strictly `"Name"`.
 - **Cell B2**: Must be strictly `"Marks"`.
 - **Cell C2**: `"Comments"` (Optional).
 
-### Row 3+ (Data)
-- **Column A**: Student Name (string). identifier.
-- **Column B**: Marks.
-  - Integer/Float: valid score.
-  - `"AB"`, `"ABS"`, or Empty: **Absent** (value = `null`).
-- **Column C**: Comments (string). Nullable.
+### Row 3+ (Student Performance Records)
+- **Column A**: Student name (string, matches user record).
+- **Column B**: Numeric marks or `"AB"`/`"ABS"` to represent an Absent student.
+- **Column C**: Remarks/Comments (string, optional).
+
+## Data Processing Rules
+1. **Absent Mapping**: Any mark of `"AB"` or `"ABS"` (case-insensitive) is converted to `null` in the database.
+2. **Virtual Subject "Combined"**: The virtual subject `"Combined"` (previously named `"Total"`) is dynamically calculated from other subjects in the class. Uploading/modifying data directly for `"Combined"` is forbidden.
+3. **Database Write**: Parsed records are upserted into the database. If a student's record for a topic already exists, it is overwritten with the new upload.
 
 ## Error Handling
-- **Missing File**: Log error, skip subject.
-- **Corrupt Header**: Log specific error (e.g., "Sheet 'Circles' in 'Maths.xlsx' missing Date in A1"). Skip sheet.
-- **Invalid Data Row**: If name is missing, skip row. If marks are invalid (non-numeric and not AB), treat as null/0 or log warning? -> **Treat as null**.
-
-## Output Data Shape
-The parser transforms Excel data into the `SubjectData` JSON object defined in `gemini.md`.
+- **Invalid Header Schema**: If Row 1 or Row 2 fails validation, the parser rejects the upload, reporting the specific cell mismatch.
+- **Invalid Marks**: If marks are non-numeric and not `"AB"`, the row is treated as absent (`null`) or rejected with a validation toast on the client side.

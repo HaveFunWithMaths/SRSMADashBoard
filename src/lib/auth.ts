@@ -45,17 +45,11 @@ export const authOptions: NextAuthOptions = {
 
                 const users = await getUsersFromDB();
 
-                // Search by roll number (username field) first, then by actual name as fallback.
-                // This handles DB migrations where the login identifier may have changed.
+                // Search by roll number (username field) only.
                 const credLower = credentials.username.toLowerCase().trim();
-                let user = users.find((u) =>
+                const user = users.find((u) =>
                     (u.username || '').toLowerCase().trim() === credLower
                 );
-                if (!user) {
-                    user = users.find((u) =>
-                        (u.name || '').toLowerCase().trim() === credLower
-                    );
-                }
 
                 if (!user || !user.password) return null;
 

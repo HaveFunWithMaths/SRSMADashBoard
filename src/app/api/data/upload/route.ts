@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { savePerformanceData, addNotification } from '@/lib/db';
+import { savePerformanceData, addNotification, isTeacherMapped } from '@/lib/db';
 
 export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
@@ -16,6 +16,14 @@ export async function POST(request: Request) {
 
         if (!className || !subject || !topicName || !date || typeof totalMarks !== 'number' || !Array.isArray(students)) {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
+
+        const isRegularTeacher = session.user.role === 'teacher' && session.user.name?.toLowerCase() !== 'srsma';
+        if (isRegularTeacher) {
+            const hasPermission = await isTeacherMapped(session.user.username || '', String(className), String(subject));
+            if (!hasPermission) {
+                return NextResponse.json({ error: 'Forbidden: You do not have permission to upload marks for this subject.' }, { status: 403 });
+            }
         }
 
         // Save into PostgreSQL database since filesystem is ephemeral in Vercel.

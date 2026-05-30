@@ -94,6 +94,24 @@ export async function initializeDatabase(): Promise<void> {
             created_at TIMESTAMP DEFAULT NOW()
         )
     `;
+
+    await sql`
+        CREATE TABLE IF NOT EXISTS teacher_mappings (
+            id SERIAL PRIMARY KEY,
+            teacher_username VARCHAR(255) NOT NULL,
+            class_name VARCHAR(50) NOT NULL,
+            subject VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(teacher_username, class_name, subject)
+        )
+    `;
+
+    // Migrate any legacy 'Total' subject entries to 'Combined'
+    await sql`
+        UPDATE performance_marks
+        SET subject = 'Combined'
+        WHERE subject = 'Total'
+    `;
 }
 // ---------- Performance Queries ----------
 
@@ -697,4 +715,167 @@ function folderToExcelClassValues(folderName: string): string[] {
     const values: string[] = [raw];
     values.push(raw.toLowerCase(), raw.toUpperCase());
     return [...new Set(values)];
+}
+
+// ---------- Teacher Management Helpers ----------
+
+export interface TeacherMapping {
+    id: number;
+    teacher_username: string;
+    class_name: string;
+    subject: string;
+}
+
+export async function getAllTeachers(): Promise<DBUser[]> {
+    const sql = getSQL();
+    const rows = await sql`
+        SELECT * FROM users
+        WHERE LOWER(role) = 'teacher'
+        ORDER BY name
+    `;
+    return rows as DBUser[];
+}
+
+export async function addTeacher(name: string, password: string): Promise<void> {
+    const sql = getSQL();
+    const trimmedName = name.trim();
+    
+    // Check if user already exists
+    const existing = await sql`
+        SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedName}) LIMIT 1
+    `;
+    if (existing.length > 0) {
+        throw new Error('A user with this name already exists.');
+    }
+    
+    await sql`
+        INSERT INTO users (name, password, class, role, username, status)
+        VALUES (${trimmedName}, ${password.trim()}, null, 'teacher', ${trimmedName}, 'Active')
+    `;
+}
+
+export async function updateTeacher(oldName: string, newName: string, password?: string): Promise<boolean> {
+    const sql = getSQL();
+    const trimmedNewName = newName.trim();
+    const trimmedOldName = oldName.trim();
+    
+    if (trimmedOldName.toLowerCase() !== trimmedNewName.toLowerCase()) {
+        const existing = await sql`
+            SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedNewName}) LIMIT 1
+        `;
+        if (existing.length > 0) {
+            throw new Error('A user with this name already exists.');
+        }
+    }
+
+    let result;
+    if (password && password.trim() !== '') {
+        result = await sql`
+            UPDATE users
+            SET name = ${trimmedNewName},
+                username = ${trimmedNewName},
+                password = ${password.trim()}
+            WHERE name = ${trimmedOldName} AND LOWER(role) = 'teacher'
+            RETURNING id
+        `;
+    } else {
+        result = await sql`
+            UPDATE users
+            SET name = ${trimmedNewName},
+                username = ${trimmedNewName}
+            WHERE name = ${trimmedOldName} AND LOWER(role) = 'teacher'
+            RETURNING id
+        `;
+    }
+
+    if (result.length > 0) {
+        await sql`
+            UPDATE teacher_mappings
+            SET teacher_username = ${trimmedNewName}
+            WHERE teacher_username = ${trimmedOldName}
+        `;
+        return true;
+    }
+    return false;
+}
+
+export async function deleteTeacher(name: string): Promise<boolean> {
+    const sql = getSQL();
+    const trimmedName = name.trim();
+    const result = await sql`
+        DELETE FROM users
+        WHERE name = ${trimmedName} AND LOWER(role) = 'teacher'
+        RETURNING id
+    `;
+    if (result.length > 0) {
+        await sql`
+            DELETE FROM teacher_mappings
+            WHERE teacher_username = ${trimmedName}
+        `;
+        return true;
+    }
+    return false;
+}
+
+export async function getTeacherMappings(): Promise<TeacherMapping[]> {
+    const sql = getSQL();
+    const rows = await sql`
+        SELECT * FROM teacher_mappings
+        ORDER BY teacher_username, class_name, subject
+    `;
+    return rows as TeacherMapping[];
+}
+
+export async function getMappingsForTeacher(teacherUsername: string): Promise<TeacherMapping[]> {
+    const sql = getSQL();
+    const rows = await sql`
+        SELECT * FROM teacher_mappings
+        WHERE LOWER(teacher_username) = LOWER(${teacherUsername.trim()})
+        ORDER BY class_name, subject
+    `;
+    return rows as TeacherMapping[];
+}
+
+export async function addTeacherMapping(teacherUsername: string, className: string, subject: string): Promise<void> {
+    const sql = getSQL();
+    await sql`
+        INSERT INTO teacher_mappings (teacher_username, class_name, subject)
+        VALUES (${teacherUsername.trim()}, ${className.trim()}, ${subject.trim()})
+        ON CONFLICT (teacher_username, class_name, subject) DO NOTHING
+    `;
+}
+
+export async function deleteTeacherMapping(teacherUsername: string, className: string, subject: string): Promise<void> {
+    const sql = getSQL();
+    await sql`
+        DELETE FROM teacher_mappings
+        WHERE teacher_username = ${teacherUsername.trim()}
+          AND class_name = ${className.trim()}
+          AND subject = ${subject.trim()}
+    `;
+}
+
+export async function isTeacherMapped(teacherUsername: string, className: string, subject: string): Promise<boolean> {
+    const sql = getSQL();
+    
+    // If subject is Combined and the class is Class 11, Class 12, or Class 12+,
+    // check if the teacher is mapped to ANY subject for this class.
+    if (subject.toLowerCase() === 'combined' && ['class_11', 'class_12', 'class_12+'].includes(className.toLowerCase())) {
+        const rows = await sql`
+            SELECT 1 FROM teacher_mappings
+            WHERE LOWER(teacher_username) = LOWER(${teacherUsername.trim()})
+              AND LOWER(class_name) = LOWER(${className.trim()})
+            LIMIT 1
+        `;
+        return rows.length > 0;
+    }
+
+    const rows = await sql`
+        SELECT 1 FROM teacher_mappings
+        WHERE LOWER(teacher_username) = LOWER(${teacherUsername.trim()})
+          AND LOWER(class_name) = LOWER(${className.trim()})
+          AND LOWER(subject) = LOWER(${subject.trim()})
+        LIMIT 1
+    `;
+    return rows.length > 0;
 }

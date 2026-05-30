@@ -28,7 +28,7 @@ export default function TeacherDashboard() {
     const [topicDetails, setTopicDetails] = useState<any>(null);
     const [students, setStudents] = useState<any[]>([]);
     const [selectedStudent, setSelectedStudent] = useState('');
-    const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload' | 'analytics'>('analysis');
+    const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload' | 'analytics' | 'manage-teachers'>('analysis');
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
     const [showPerformanceMatrix, setShowPerformanceMatrix] = useState(true);
 
@@ -77,8 +77,41 @@ export default function TeacherDashboard() {
     // Password masking state
     const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
 
+    // Bulk Edit states
+    const [isBulkEditing, setIsBulkEditing] = useState(false);
+    const [bulkDraft, setBulkDraft] = useState<Record<string, { marks: string; comments: string }>>({});
+    const [isSavingBulk, setIsSavingBulk] = useState(false);
+
+    // Add Class Modal state
+    const [showAddClassModal, setShowAddClassModal] = useState(false);
+    const [newClassNameModalInput, setNewClassNameModalInput] = useState('');
+
+    // Teacher check
+    const isRegularTeacher = session?.user?.role !== 'admin' &&
+                            session?.user?.name?.toLowerCase() !== 'srsma' &&
+                            session?.user?.username?.toLowerCase() !== 'srsma';
+
+    // Teacher Mappings & Accounts Admin state
+    const [teachersList, setTeachersList] = useState<any[]>([]);
+    const [teacherMappings, setTeacherMappings] = useState<any[]>([]);
+    const [newTeacherName, setNewTeacherName] = useState('');
+    const [newTeacherPassword, setNewTeacherPassword] = useState('');
+    const [editingTeacherNameId, setEditingTeacherNameId] = useState<number | null>(null);
+    const [editedTeacherNameVal, setEditedTeacherNameVal] = useState('');
+    const [editedTeacherPasswordVal, setEditedTeacherPasswordVal] = useState('');
+    const [isAddingTeacherAction, setIsAddingTeacherAction] = useState(false);
+    const [selectedTeacherClasses, setSelectedTeacherClasses] = useState<Record<string, string>>({});
+    const [selectedTeacherSubjects, setSelectedTeacherSubjects] = useState<Record<string, string>>({});
+    const [selectedTeacherSubjectsMulti, setSelectedTeacherSubjectsMulti] = useState<Record<string, string[]>>({});
+    const [mappingToDelete, setMappingToDelete] = useState<{ teacherUsername: string; className: string; subject: string } | null>(null);
+    const [teacherPermissions, setTeacherPermissions] = useState<any[]>([]);
+
     const handleSaveTopicDetails = async () => {
         if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
+        if (!isSubjectEditable) {
+            toast.error('You do not have permission to edit topic details for this subject');
+            return;
+        }
         setIsSavingTopicDetails(true);
         try {
             const res = await fetch('/api/admin/topic', {
@@ -192,7 +225,207 @@ export default function TeacherDashboard() {
 
     useEffect(() => {
         if (status === 'unauthenticated') router.push('/login');
-    }, [status, router]);
+        if (session && session.user?.role === 'student') router.push('/dashboard');
+    }, [status, session, router]);
+
+    useEffect(() => {
+        if (isRegularTeacher && (activeTab === 'manage' || activeTab === 'analytics' || activeTab === 'manage-teachers')) {
+            setActiveTab('analysis');
+        }
+    }, [activeTab, isRegularTeacher]);
+
+    // Load teacher permissions on mount (or if user changes)
+    const fetchTeacherPermissions = useCallback(async () => {
+        if (isRegularTeacher) {
+            try {
+                const res = await fetch('/api/data?type=teacher-permissions');
+                const data = await res.json();
+                if (data && Array.isArray(data.permissions)) {
+                    setTeacherPermissions(data.permissions);
+                }
+            } catch (err) {
+                console.error('Error fetching teacher permissions:', err);
+            }
+        }
+    }, [isRegularTeacher]);
+
+    const fetchTeachersAndMappings = useCallback(async () => {
+        console.log("[Client Debug] fetchTeachersAndMappings triggered. isRegularTeacher:", isRegularTeacher, "session:", session);
+        if (!isRegularTeacher) {
+            try {
+                const res = await fetch('/api/admin/teachers');
+                console.log("[Client Debug] fetchTeachersAndMappings response status:", res.status);
+                if (!res.ok) {
+                    const data = await res.json();
+                    console.error('[Client Debug] fetchTeachersAndMappings error response:', data);
+                    toast.error(`Failed to load teachers: ${data.error || 'Server error'}`);
+                    return;
+                }
+                const data = await res.json();
+                console.log("[Client Debug] fetchTeachersAndMappings success response:", data);
+                if (data) {
+                    if (Array.isArray(data.teachers)) setTeachersList(data.teachers);
+                    if (Array.isArray(data.mappings)) setTeacherMappings(data.mappings);
+                }
+            } catch (err) {
+                console.error('[Client Debug] Error fetching teachers and mappings:', err);
+                toast.error('Network error loading teachers');
+            }
+        } else {
+            console.log("[Client Debug] Skipping fetchTeachersAndMappings because user is regular teacher.");
+        }
+    }, [isRegularTeacher, session]);
+
+    useEffect(() => {
+        fetchTeacherPermissions();
+    }, [fetchTeacherPermissions]);
+
+    useEffect(() => {
+        fetchTeachersAndMappings();
+    }, [fetchTeachersAndMappings]);
+
+    const handleAddNewTeacher = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newTeacherName.trim() || !newTeacherPassword.trim()) return;
+        setIsAddingTeacherAction(true);
+        try {
+            const res = await fetch('/api/admin/teachers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'addTeacher', name: newTeacherName.trim(), password: newTeacherPassword.trim() })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success('Teacher added successfully');
+                setNewTeacherName('');
+                setNewTeacherPassword('');
+                await fetchTeachersAndMappings();
+            } else {
+                toast.error(data.error || 'Failed to add teacher');
+            }
+        } catch (err) {
+            toast.error('Error adding teacher');
+        } finally {
+            setIsAddingTeacherAction(false);
+        }
+    };
+
+    const handleSaveTeacherEdit = async (teacher: any) => {
+        if (!editedTeacherNameVal.trim()) return;
+        try {
+            const res = await fetch('/api/admin/teachers', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oldName: teacher.name, newName: editedTeacherNameVal.trim(), password: editedTeacherPasswordVal })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success('Teacher details updated');
+                setEditingTeacherNameId(null);
+                await fetchTeachersAndMappings();
+            } else {
+                toast.error(data.error || 'Failed to update teacher');
+            }
+        } catch (err) {
+            toast.error('Error updating teacher');
+        }
+    };
+
+    const handleDeleteTeacher = async (name: string) => {
+        if (!window.confirm(`Are you sure you want to delete teacher ${name} and all their mappings?`)) return;
+        try {
+            const res = await fetch('/api/admin/teachers', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'deleteTeacher', name })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success('Teacher deleted successfully');
+                await fetchTeachersAndMappings();
+            } else {
+                toast.error(data.error || 'Failed to delete teacher');
+            }
+        } catch (err) {
+            toast.error('Error deleting teacher');
+        }
+    };
+
+    const getDynamicSubjectsForClass = (clsName: string) => {
+        if (!clsName) return [];
+        const is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(clsName);
+        if (is11Or12) {
+            return ['Maths', 'Physics', 'Chemistry'];
+        }
+        return ['Maths', 'Physics', 'Chemistry', 'Biology'];
+    };
+
+    const handleAddMultiMapping = async (teacherUsername: string) => {
+        const cls = selectedTeacherClasses[teacherUsername];
+        const subs = selectedTeacherSubjectsMulti[teacherUsername] || [];
+        if (!cls || subs.length === 0) return;
+
+        let successCount = 0;
+        let failCount = 0;
+        let lastError = '';
+
+        for (const sub of subs) {
+            try {
+                const res = await fetch('/api/admin/teachers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'addMapping', teacherUsername, className: cls, subject: sub })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    successCount++;
+                } else {
+                    failCount++;
+                    lastError = data.error || 'Failed to add mapping';
+                }
+            } catch (err) {
+                failCount++;
+                lastError = 'Network error adding mapping';
+            }
+        }
+
+        if (successCount > 0) {
+            toast.success(`Successfully added ${successCount} mapping(s)`);
+            setSelectedTeacherClasses(prev => ({ ...prev, [teacherUsername]: '' }));
+            setSelectedTeacherSubjectsMulti(prev => ({ ...prev, [teacherUsername]: [] }));
+            await fetchTeachersAndMappings();
+        }
+        if (failCount > 0) {
+            toast.error(`Failed to add ${failCount} mapping(s): ${lastError}`);
+        }
+    };
+
+    const handleDeleteMapping = (teacherUsername: string, className: string, subject: string) => {
+        setMappingToDelete({ teacherUsername, className, subject });
+    };
+
+    const confirmDeleteMapping = async () => {
+        if (!mappingToDelete) return;
+        const { teacherUsername, className, subject } = mappingToDelete;
+        try {
+            const res = await fetch('/api/admin/teachers', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'deleteMapping', teacherUsername, className, subject })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success('Mapping removed successfully');
+                await fetchTeachersAndMappings();
+            } else {
+                toast.error(data.error || 'Failed to remove mapping');
+            }
+        } catch (err) {
+            toast.error('Error removing mapping');
+        } finally {
+            setMappingToDelete(null);
+        }
+    };
 
     const fetchClasses = async () => {
         try {
@@ -231,7 +464,7 @@ export default function TeacherDashboard() {
                 if (Array.isArray(data)) {
                     const is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(selectedClass);
                     const requiredSubjects = is11Or12
-                        ? ['Maths', 'Physics', 'Chemistry', 'Total']
+                        ? ['Maths', 'Physics', 'Chemistry', 'Combined']
                         : ['Maths', 'Physics', 'Chemistry', 'Biology'];
                     const merged = Array.from(new Set([...data, ...requiredSubjects]));
 
@@ -246,10 +479,24 @@ export default function TeacherDashboard() {
                     });
 
                     setSubjects(sortedSubjects);
-                    if (sortedSubjects.length > 0) setSelectedSubject(sortedSubjects[0]);
+                    if (sortedSubjects.length > 0) {
+                        let defaultSub = sortedSubjects[0];
+                        if (isRegularTeacher && teacherPermissions.length > 0) {
+                            const taughtSub = sortedSubjects.find(sub =>
+                                teacherPermissions.some((p: any) =>
+                                    p.class_name.toLowerCase() === selectedClass.toLowerCase() &&
+                                    p.subject.toLowerCase() === sub.toLowerCase()
+                                )
+                            );
+                            if (taughtSub) {
+                                defaultSub = taughtSub;
+                            }
+                        }
+                        setSelectedSubject(defaultSub);
+                    }
                 }
             });
-    }, [selectedClass]);
+    }, [selectedClass, isRegularTeacher, teacherPermissions]);
 
     useEffect(() => {
         if (!selectedClass || !selectedSubject) return;
@@ -401,6 +648,10 @@ export default function TeacherDashboard() {
     const handleUploadMarks = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedClass || !selectedSubject || !uploadTopicName || !uploadTotalMarks) return;
+        if (!isSubjectEditable) {
+            toast.error('You do not have permission to upload marks for this subject');
+            return;
+        }
 
         setIsUploading(true);
         try {
@@ -458,6 +709,23 @@ export default function TeacherDashboard() {
         if (mark < lowCutoff) return { bg: '#fee2e2', text: '#991b1b' }; // Red
         return { bg: '#fef9c3', text: '#854d0e' }; // Yellow
     };
+
+    const isSubjectEditable = useMemo(() => {
+        if (!isRegularTeacher) return true;
+        if (!selectedClass || !selectedSubject) return false;
+
+        // Combined is editable by default if the teacher is teaching any subject in Class 11, 12, or 12+
+        if (selectedSubject.toLowerCase() === 'combined' && ['class_11', 'class_12', 'class_12+'].includes(selectedClass.toLowerCase())) {
+            return teacherPermissions.some(
+                (p: any) => p.class_name.toLowerCase() === selectedClass.toLowerCase()
+            );
+        }
+
+        return teacherPermissions.some(
+            (p: any) => p.class_name.toLowerCase() === selectedClass.toLowerCase() &&
+                       p.subject.toLowerCase() === selectedSubject.toLowerCase()
+        );
+    }, [isRegularTeacher, selectedClass, selectedSubject, teacherPermissions]);
 
     // BUG-01 FIX: useMemo must be called BEFORE any early returns (React Rules of Hooks).
     const pivotTableData = useMemo(() => {
@@ -587,6 +855,10 @@ export default function TeacherDashboard() {
 
     const handleSaveStudentMark = async (studentName: string) => {
         if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
+        if (!isSubjectEditable) {
+            toast.error('You do not have permission to edit marks for this subject');
+            return;
+        }
         const parsedMarks = draftStudentMarks.trim() === '' || draftStudentMarks.trim().toUpperCase() === 'AB' ? null : Number(draftStudentMarks.trim());
         if (draftStudentMarks.trim() !== '' && draftStudentMarks.trim().toUpperCase() !== 'AB' && (parsedMarks === null || isNaN(parsedMarks) || parsedMarks < 0 || parsedMarks > topicDetails.totalMarks)) {
             toast.error(`Enter valid marks between 0 and ${topicDetails.totalMarks}`);
@@ -622,6 +894,118 @@ export default function TeacherDashboard() {
         }
     };
 
+    const handleStartBulkEdit = () => {
+        const initialDraft: Record<string, { marks: string; comments: string }> = {};
+        tableData.forEach((s: any) => {
+            initialDraft[s.name] = {
+                marks: s.marks !== null ? String(s.marks) : '',
+                comments: s.comments || ''
+            };
+        });
+        setBulkDraft(initialDraft);
+        setIsBulkEditing(true);
+    };
+
+    const handleSaveBulkMarks = async () => {
+        if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
+        if (!isSubjectEditable) {
+            toast.error('You do not have permission to edit marks for this subject');
+            return;
+        }
+
+        // Validation
+        for (const [studentName, draft] of Object.entries(bulkDraft)) {
+            const m = draft.marks.trim();
+            if (m !== '' && m.toUpperCase() !== 'AB') {
+                const num = Number(m);
+                if (isNaN(num) || num < 0 || num > topicDetails.totalMarks) {
+                    toast.error(`Enter valid marks between 0 and ${topicDetails.totalMarks} for ${studentName}`);
+                    return;
+                }
+            }
+        }
+
+        setIsSavingBulk(true);
+        try {
+            const updates = Object.entries(bulkDraft).map(([studentName, draft]) => {
+                const m = draft.marks.trim();
+                const marksValue = (m === '' || m.toUpperCase() === 'AB') ? null : Number(m);
+                return {
+                    studentName,
+                    marks: marksValue,
+                    comments: draft.comments.trim() || null
+                };
+            });
+
+            const res = await fetch('/api/data/performance', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    isBulk: true,
+                    className: selectedClass,
+                    subject: selectedSubject,
+                    topicName: selectedTopic,
+                    updates
+                })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                toast.success('All marks updated successfully');
+                setIsBulkEditing(false);
+                await refreshBatchData();
+            } else {
+                toast.error(result.error || 'Failed to update marks');
+            }
+        } catch (error) {
+            toast.error('Error updating marks');
+        } finally {
+            setIsSavingBulk(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: 'marks' | 'remarks', index: number) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextInput = document.getElementById(`${field}-${index + 1}`);
+            if (nextInput) {
+                (nextInput as HTMLInputElement).focus();
+                (nextInput as HTMLInputElement).select();
+            }
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                if (field === 'remarks') {
+                    const prevInput = document.getElementById(`marks-${index}`);
+                    if (prevInput) {
+                        (prevInput as HTMLInputElement).focus();
+                        (prevInput as HTMLInputElement).select();
+                    }
+                } else {
+                    const prevInput = document.getElementById(`remarks-${index - 1}`);
+                    if (prevInput) {
+                        (prevInput as HTMLInputElement).focus();
+                        (prevInput as HTMLInputElement).select();
+                    }
+                }
+            } else {
+                if (field === 'marks') {
+                    const nextInput = document.getElementById(`remarks-${index}`);
+                    if (nextInput) {
+                        (nextInput as HTMLInputElement).focus();
+                        (nextInput as HTMLInputElement).select();
+                    }
+                } else {
+                    const nextInput = document.getElementById(`marks-${index + 1}`);
+                    if (nextInput) {
+                        (nextInput as HTMLInputElement).focus();
+                        (nextInput as HTMLInputElement).select();
+                    }
+                }
+            }
+        }
+    };
+
     return (
         <>
             <Header />
@@ -638,13 +1022,20 @@ export default function TeacherDashboard() {
                 <div className="tabs">
                     <button onClick={() => setActiveTab('analysis')} className={`tab-btn ${activeTab === 'analysis' ? 'active' : ''}`}>📈 Subject Analysis</button>
                     <button onClick={() => setActiveTab('students')} className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}>🎓 Student Dashboard</button>
-                    <button onClick={() => setActiveTab('manage')} className={`tab-btn ${activeTab === 'manage' ? 'active' : ''}`}>👥 Class Manager</button>
+                    {!isRegularTeacher && (
+                        <button onClick={() => setActiveTab('manage')} className={`tab-btn ${activeTab === 'manage' ? 'active' : ''}`}>👥 Class Manager</button>
+                    )}
                     <button onClick={() => setActiveTab('upload')} className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}>📤 Upload Marks</button>
-                    <button onClick={() => setActiveTab('analytics')} className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}>📊 User Analytics</button>
+                    {!isRegularTeacher && (
+                        <button onClick={() => setActiveTab('manage-teachers')} className={`tab-btn ${activeTab === 'manage-teachers' ? 'active' : ''}`}>👥 Manage Teachers</button>
+                    )}
+                    {!isRegularTeacher && (
+                        <button onClick={() => setActiveTab('analytics')} className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}>📊 User Analytics</button>
+                    )}
                 </div>
 
                 {/* Controls */}
-                {activeTab !== 'analytics' && (
+                {activeTab !== 'analytics' && activeTab !== 'manage-teachers' && (
                     <div className="card" style={{ marginBottom: '1.5rem' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', alignItems: 'start' }}>
 
@@ -940,7 +1331,7 @@ export default function TeacherDashboard() {
                                                 <div>
                                                     <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Subject</label>
                                                     <select value={editTopicSubject} onChange={e => setEditTopicSubject(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', outline: 'none' }}>
-                                                        {subjects.filter(s => s !== 'Total').map(s => <option key={s} value={s}>{s}</option>)}
+                                                        {subjects.filter(s => s !== 'Combined').map(s => <option key={s} value={s}>{s}</option>)}
                                                     </select>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem' }}>
@@ -955,15 +1346,17 @@ export default function TeacherDashboard() {
                                                         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', margin: 0, fontFamily: 'Outfit, sans-serif' }}>
                                                             {selectedTopic}
                                                         </h3>
-                                                        <button onClick={() => {
-                                                            setEditTopicName(selectedTopic || '');
-                                                            setEditTopicDate(topicDetails.date ? new Date(topicDetails.date).toISOString().split('T')[0] : '');
-                                                            setEditTopicTotalMarks(String(topicDetails.totalMarks));
-                                                            setEditTopicSubject(selectedSubject);
-                                                            setIsEditingTopicDetails(true);
-                                                        }} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Edit Test Details">
-                                                            <Edit2 size={16} />
-                                                        </button>
+                                                        {isSubjectEditable && (
+                                                            <button onClick={() => {
+                                                                setEditTopicName(selectedTopic || '');
+                                                                setEditTopicDate(topicDetails.date ? new Date(topicDetails.date).toISOString().split('T')[0] : '');
+                                                                setEditTopicTotalMarks(String(topicDetails.totalMarks));
+                                                                setEditTopicSubject(selectedSubject);
+                                                                setIsEditingTopicDetails(true);
+                                                            }} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Edit Test Details">
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                     <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
                                                         {(() => {
@@ -998,6 +1391,55 @@ export default function TeacherDashboard() {
                                                     >
                                                         {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
                                                     </button>
+                                                    {isSubjectEditable && (
+                                                        isBulkEditing ? (
+                                                            <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.5rem' }}>
+                                                                <button
+                                                                    onClick={handleSaveBulkMarks}
+                                                                    disabled={isSavingBulk}
+                                                                    style={{
+                                                                        backgroundColor: '#10b981',
+                                                                        border: 'none', padding: '0.5rem 1rem',
+                                                                        borderRadius: '0.5rem', cursor: 'pointer',
+                                                                        color: '#fff',
+                                                                        fontSize: '0.85rem', fontWeight: 600,
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    {isSavingBulk ? 'Saving...' : 'Save'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setIsBulkEditing(false)}
+                                                                    disabled={isSavingBulk}
+                                                                    style={{
+                                                                        backgroundColor: '#ef4444',
+                                                                        border: 'none', padding: '0.5rem 1rem',
+                                                                        borderRadius: '0.5rem', cursor: 'pointer',
+                                                                        color: '#fff',
+                                                                        fontSize: '0.85rem', fontWeight: 600,
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={handleStartBulkEdit}
+                                                                style={{
+                                                                    backgroundColor: '#f1f5f9',
+                                                                    border: '1px solid #cbd5e1', padding: '0.5rem 1rem',
+                                                                    borderRadius: '0.5rem', cursor: 'pointer',
+                                                                    color: '#475569',
+                                                                    fontSize: '0.85rem', fontWeight: 600,
+                                                                    transition: 'all 0.2s',
+                                                                    marginLeft: '0.5rem'
+                                                                }}
+                                                            >
+                                                                Bulk Edit
+                                                            </button>
+                                                        )
+                                                    )}
                                                 </div>
                                             </>
                                         )}
@@ -1062,7 +1504,23 @@ export default function TeacherDashboard() {
                                                             {student.name}
                                                         </td>
                                                         <td style={{ padding: '0.75rem', textAlign: 'center', color: '#64748b' }}>
-                                                            {editingStudentRow === student.name ? (
+                                                            {isBulkEditing ? (
+                                                                <input
+                                                                    id={`marks-${idx}`}
+                                                                    type="text"
+                                                                    value={bulkDraft[student.name]?.marks ?? ''}
+                                                                    onChange={e => setBulkDraft(prev => ({
+                                                                        ...prev,
+                                                                        [student.name]: {
+                                                                            ...prev[student.name],
+                                                                            marks: e.target.value
+                                                                        }
+                                                                    }))}
+                                                                    onKeyDown={e => handleKeyDown(e, 'marks', idx)}
+                                                                    style={{ width: '60px', padding: '0.25rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem', textAlign: 'center' }}
+                                                                    placeholder="AB"
+                                                                />
+                                                            ) : editingStudentRow === student.name ? (
                                                                 <input type="text" value={draftStudentMarks} onChange={e => setDraftStudentMarks(e.target.value)} style={{ width: '50px', padding: '0.25rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }} disabled={isSavingMark} placeholder="AB" />
                                                             ) : (
                                                                 <>{student.marks ?? '-'} <span style={{ fontSize: '0.8em', opacity: 0.7 }}>/ {student.totalMarks}</span></>
@@ -1081,20 +1539,40 @@ export default function TeacherDashboard() {
                                                             ) : '-'}
                                                         </td>
                                                         <td style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.85rem' }}>
-                                                            {editingStudentRow === student.name ? (
+                                                            {isBulkEditing ? (
+                                                                <input
+                                                                    id={`remarks-${idx}`}
+                                                                    type="text"
+                                                                    value={bulkDraft[student.name]?.comments ?? ''}
+                                                                    onChange={e => setBulkDraft(prev => ({
+                                                                        ...prev,
+                                                                        [student.name]: {
+                                                                            ...prev[student.name],
+                                                                            comments: e.target.value
+                                                                        }
+                                                                    }))}
+                                                                    onKeyDown={e => handleKeyDown(e, 'remarks', idx)}
+                                                                    style={{ width: '100%', padding: '0.25rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }}
+                                                                    placeholder="Remarks"
+                                                                />
+                                                            ) : editingStudentRow === student.name ? (
                                                                 <input type="text" value={draftStudentComments} onChange={e => setDraftStudentComments(e.target.value)} style={{ width: '100%', padding: '0.25rem', border: '1px solid #cbd5e1', borderRadius: '0.25rem' }} disabled={isSavingMark} placeholder="Remarks" />
                                                             ) : (
                                                                 student.comments || '-'
                                                             )}
                                                         </td>
                                                         <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                                                            {editingStudentRow === student.name ? (
+                                                            {isBulkEditing ? (
+                                                                <span style={{ color: '#cbd5e1' }}>-</span>
+                                                            ) : editingStudentRow === student.name ? (
                                                                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                                                                     <button onClick={() => handleSaveStudentMark(student.name)} disabled={isSavingMark} style={{ color: '#10b981', border: 'none', background: 'transparent', cursor: 'pointer' }} title="Save"><UploadCloud size={16} /></button>
                                                                     <button onClick={() => setEditingStudentRow(null)} disabled={isSavingMark} style={{ color: '#ef4444', border: 'none', background: 'transparent', cursor: 'pointer' }} title="Cancel">✕</button>
                                                                 </div>
-                                                            ) : (
+                                                            ) : isSubjectEditable ? (
                                                                 <button onClick={() => { setEditingStudentRow(student.name); setDraftStudentMarks(student.marks !== null ? String(student.marks) : ''); setDraftStudentComments(student.comments || ''); }} style={{ color: '#64748b', border: 'none', background: 'transparent', cursor: 'pointer' }} title="Edit Marks"><Edit2 size={16} /></button>
+                                                            ) : (
+                                                                <span style={{ color: '#cbd5e1' }}>-</span>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -1162,6 +1640,24 @@ export default function TeacherDashboard() {
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h3 className="card-title" style={{ margin: 0 }}>Manage Students for: {selectedClass ? selectedClass.replace(/_/g, ' ') : 'None'}</h3>
+                            <button
+                                onClick={() => setShowAddClassModal(true)}
+                                style={{
+                                    padding: '0.5rem 1rem',
+                                    backgroundColor: '#7c3aed',
+                                    border: 'none',
+                                    color: '#fff',
+                                    borderRadius: '0.5rem',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                }}
+                            >
+                                + Add Class
+                            </button>
                         </div>
 
                         <form onSubmit={handleAddStudent} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
@@ -1582,28 +2078,56 @@ export default function TeacherDashboard() {
                 )}
                 {activeTab === 'upload' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                        {!isSubjectEditable && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1rem',
+                                padding: '1rem 1.5rem',
+                                backgroundColor: '#fffbeb',
+                                border: '1px solid #fef3c7',
+                                borderRadius: '0.5rem',
+                                color: '#b45309',
+                                marginBottom: '1.5rem',
+                                fontSize: '0.9rem',
+                                fontWeight: 500
+                            }}>
+                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                <span>
+                                    You are viewing this subject in <strong>read-only mode</strong> because you are not assigned as the teacher for <strong>{selectedSubject}</strong> in <strong>{selectedClass.replace(/_/g, ' ')}</strong>.
+                                </span>
+                            </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                             <h3 className="card-title" style={{ margin: 0 }}>Upload Marks: {selectedClass.replace(/_/g, ' ')} - {selectedSubject}</h3>
                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                <button
-                                    type="button"
-                                    onClick={handleDownloadTemplate}
-                                    style={{
-                                        backgroundColor: '#fff', border: '1px solid #cbd5e1', padding: '0.4rem 0.8rem',
-                                        borderRadius: '0.5rem', cursor: 'pointer', color: '#475569', fontSize: '0.85rem', fontWeight: 600,
-                                        display: 'flex', alignItems: 'center', gap: '0.4rem'
-                                    }}
-                                >
-                                    <FileSpreadsheet size={16} /> Sample Template
-                                </button>
-                                <label style={{
-                                    backgroundColor: '#7c3aed', border: 'none', padding: '0.4rem 0.8rem',
-                                    borderRadius: '0.5rem', cursor: 'pointer', color: '#fff', fontSize: '0.85rem', fontWeight: 600,
-                                    display: 'flex', alignItems: 'center', gap: '0.4rem'
-                                }}>
-                                    <UploadCloud size={16} /> Upload Excel
-                                    <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} style={{ display: 'none' }} />
-                                </label>
+                                {isSubjectEditable && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={handleDownloadTemplate}
+                                            style={{
+                                                backgroundColor: '#fff', border: '1px solid #cbd5e1', padding: '0.4rem 0.8rem',
+                                                borderRadius: '0.5rem', cursor: 'pointer', color: '#475569', fontSize: '0.85rem', fontWeight: 600,
+                                                display: 'flex', alignItems: 'center', gap: '0.4rem'
+                                            }}
+                                        >
+                                            <FileSpreadsheet size={16} /> Sample Template
+                                        </button>
+                                        <label style={{
+                                            backgroundColor: '#7c3aed', border: 'none', padding: '0.4rem 0.8rem',
+                                            borderRadius: '0.5rem', cursor: 'pointer', color: '#fff', fontSize: '0.85rem', fontWeight: 600,
+                                            display: 'flex', alignItems: 'center', gap: '0.4rem'
+                                        }}>
+                                            <UploadCloud size={16} /> Upload Excel
+                                            <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} style={{ display: 'none' }} />
+                                        </label>
+                                    </>
+                                )}
                                 <button
                                     onClick={() => {
                                         setCustomHighCutoff(uploadHighCutoff !== null ? Number(uploadHighCutoff.toFixed(2)) : null);
@@ -1677,6 +2201,7 @@ export default function TeacherDashboard() {
                                         onChange={e => setUploadTopicName(e.target.value)}
                                         placeholder="e.g. Chapter 1 Test"
                                         required
+                                        disabled={!isSubjectEditable}
                                         style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
                                     />
                                 </div>
@@ -1687,6 +2212,7 @@ export default function TeacherDashboard() {
                                         value={uploadDate}
                                         onChange={e => setUploadDate(e.target.value)}
                                         required
+                                        disabled={!isSubjectEditable}
                                         style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
                                     />
                                 </div>
@@ -1699,6 +2225,7 @@ export default function TeacherDashboard() {
                                         value={uploadTotalMarks}
                                         onChange={e => setUploadTotalMarks(e.target.value)}
                                         required
+                                        disabled={!isSubjectEditable}
                                         style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.5rem', outline: 'none' }}
                                     />
                                 </div>
@@ -1725,6 +2252,7 @@ export default function TeacherDashboard() {
                                                         type="number"
                                                         step="0.1"
                                                         value={student.marks}
+                                                        disabled={!isSubjectEditable}
                                                         onChange={e => {
                                                             const newStudents = [...uploadStudents];
                                                             newStudents[idx].marks = e.target.value;
@@ -1737,6 +2265,7 @@ export default function TeacherDashboard() {
                                                     <input
                                                         type="text"
                                                         value={student.comments}
+                                                        disabled={!isSubjectEditable}
                                                         onChange={e => {
                                                             const newStudents = [...uploadStudents];
                                                             newStudents[idx].comments = e.target.value;
@@ -1765,10 +2294,10 @@ export default function TeacherDashboard() {
                             <div style={{ textAlign: 'right' }}>
                                 <button
                                     type="submit"
-                                    disabled={isUploading}
+                                    disabled={isUploading || !isSubjectEditable}
                                     style={{
                                         padding: '0.75rem 2rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '0.5rem',
-                                        fontWeight: 600, cursor: isUploading ? 'not-allowed' : 'pointer', opacity: isUploading ? 0.7 : 1,
+                                        fontWeight: 600, cursor: (isUploading || !isSubjectEditable) ? 'not-allowed' : 'pointer', opacity: (isUploading || !isSubjectEditable) ? 0.6 : 1,
                                         fontSize: '1rem'
                                     }}
                                 >
@@ -2055,6 +2584,308 @@ export default function TeacherDashboard() {
                     </div>
                 )}
 
+                {activeTab === 'manage-teachers' && (
+                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                        {/* Section 1: Teacher Mappings (Mapping) */}
+                        <div style={{ marginBottom: '2.5rem' }}>
+                            <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>Teacher Mappings</h3>
+                            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.5rem' }}>
+                                Assign class and subject combinations to teachers. Teachers can only edit/upload data for their assigned subjects (though they can view all subjects of a class they teach).
+                            </p>
+                            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '0.5rem' }}>
+                                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#64748b' }}>
+                                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Teacher</th>
+                                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Assigned Mappings</th>
+                                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', width: '380px' }}>Assign New Mapping</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {teachersList.map((teacher, idx) => {
+                                            const teacherMaps = teacherMappings
+                                                .filter(m => m.teacher_username.toLowerCase() === teacher.name.toLowerCase())
+                                                .filter(m => m.subject !== 'Combined');
+                                            return (
+                                                <tr key={teacher.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#334155' }}>
+                                                        {teacher.name}
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 1rem' }}>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                            {teacherMaps.length === 0 ? (
+                                                                <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No mappings assigned</span>
+                                                            ) : (
+                                                                teacherMaps.map(m => (
+                                                                    <span
+                                                                        key={m.id}
+                                                                        style={{
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '0.35rem',
+                                                                            padding: '0.2rem 0.6rem',
+                                                                            backgroundColor: '#f3f0ff',
+                                                                            color: '#7c3aed',
+                                                                            borderRadius: '0.5rem',
+                                                                            fontSize: '0.8rem',
+                                                                            fontWeight: 600
+                                                                        }}
+                                                                    >
+                                                                        {m.class_name.replace('Class_', '')} - {m.subject}
+                                                                        <button
+                                                                            onClick={() => handleDeleteMapping(m.teacher_username, m.class_name, m.subject)}
+                                                                            style={{
+                                                                                background: 'transparent',
+                                                                                border: 'none',
+                                                                                color: '#94a3b8',
+                                                                                cursor: 'pointer',
+                                                                                fontSize: '0.9rem',
+                                                                                padding: '0 0 0 0.2rem',
+                                                                                fontWeight: 700,
+                                                                                display: 'flex',
+                                                                                alignItems: 'center'
+                                                                            }}
+                                                                            title="Delete Mapping"
+                                                                        >
+                                                                            ×
+                                                                        </button>
+                                                                    </span>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 1rem' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                                <select
+                                                                    value={selectedTeacherClasses[teacher.name] || ''}
+                                                                    onChange={e => {
+                                                                        const newClass = e.target.value;
+                                                                        setSelectedTeacherClasses(prev => ({ ...prev, [teacher.name]: newClass }));
+                                                                        setSelectedTeacherSubjectsMulti(prev => ({ ...prev, [teacher.name]: [] }));
+                                                                    }}
+                                                                    style={{
+                                                                        padding: '0.4rem 0.5rem',
+                                                                        border: '1px solid #cbd5e1',
+                                                                        borderRadius: '0.375rem',
+                                                                        fontSize: '0.85rem',
+                                                                        outline: 'none',
+                                                                        backgroundColor: '#fff',
+                                                                        flex: 1
+                                                                    }}
+                                                                >
+                                                                    <option value="">Select Class</option>
+                                                                    {classes.map(c => <option key={c} value={c}>{c.replace('Class_', '')}</option>)}
+                                                                </select>
+                                                                <button
+                                                                    onClick={() => handleAddMultiMapping(teacher.name)}
+                                                                    disabled={!selectedTeacherClasses[teacher.name] || !(selectedTeacherSubjectsMulti[teacher.name]?.length)}
+                                                                    style={{
+                                                                        padding: '0.4rem 0.8rem',
+                                                                        backgroundColor: '#7c3aed',
+                                                                        color: '#fff',
+                                                                        border: 'none',
+                                                                        borderRadius: '0.375rem',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '0.85rem',
+                                                                        cursor: 'pointer',
+                                                                        opacity: (!selectedTeacherClasses[teacher.name] || !(selectedTeacherSubjectsMulti[teacher.name]?.length)) ? 0.6 : 1,
+                                                                        transition: 'opacity 0.2s'
+                                                                    }}
+                                                                >
+                                                                    + Add
+                                                                </button>
+                                                            </div>
+                                                            
+                                                            {selectedTeacherClasses[teacher.name] && (
+                                                                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                                    {getDynamicSubjectsForClass(selectedTeacherClasses[teacher.name]).map(s => {
+                                                                        const isSelected = selectedTeacherSubjectsMulti[teacher.name]?.includes(s);
+                                                                        return (
+                                                                            <button
+                                                                                key={s}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setSelectedTeacherSubjectsMulti(prev => {
+                                                                                        const current = prev[teacher.name] || [];
+                                                                                        const next = current.includes(s)
+                                                                                            ? current.filter(item => item !== s)
+                                                                                            : [...current, s];
+                                                                                        return { ...prev, [teacher.name]: next };
+                                                                                    });
+                                                                                }}
+                                                                                style={{
+                                                                                    padding: '0.25rem 0.5rem',
+                                                                                    borderRadius: '0.375rem',
+                                                                                    fontSize: '0.78rem',
+                                                                                    fontWeight: 600,
+                                                                                    border: isSelected ? 'none' : '1px solid #cbd5e1',
+                                                                                    backgroundColor: isSelected ? '#7c3aed' : '#fff',
+                                                                                    color: isSelected ? '#fff' : '#475569',
+                                                                                    cursor: 'pointer',
+                                                                                    transition: 'all 0.15s'
+                                                                                }}
+                                                                            >
+                                                                                {s}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <hr style={{ border: 'none', borderTop: '2px solid #e2e8f0', margin: '2rem 0' }} />
+
+                        {/* Section 2: Teacher Data */}
+                        <div>
+                            <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>Teacher Accounts</h3>
+                            
+                            <form onSubmit={handleAddNewTeacher} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem', padding: '1.25rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Add New Teacher Name</label>
+                                    <input
+                                        type="text"
+                                        value={newTeacherName}
+                                        onChange={e => setNewTeacherName(e.target.value)}
+                                        placeholder="Teacher name..."
+                                        style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.375rem', fontSize: '0.9rem', outline: 'none' }}
+                                        required
+                                    />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Temporary Password</label>
+                                    <input
+                                        type="text"
+                                        value={newTeacherPassword}
+                                        onChange={e => setNewTeacherPassword(e.target.value)}
+                                        placeholder="Password..."
+                                        style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '0.375rem', fontSize: '0.9rem', outline: 'none' }}
+                                        required
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isAddingTeacherAction || !newTeacherName.trim() || !newTeacherPassword.trim()}
+                                    style={{
+                                        padding: '0.55rem 1.5rem', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '0.375rem',
+                                        fontWeight: 600, cursor: (isAddingTeacherAction || !newTeacherName.trim() || !newTeacherPassword.trim()) ? 'not-allowed' : 'pointer', opacity: (isAddingTeacherAction || !newTeacherName.trim() || !newTeacherPassword.trim()) ? 0.7 : 1,
+                                        height: '38px'
+                                    }}
+                                >
+                                    {isAddingTeacherAction ? 'Adding...' : 'Add Teacher'}
+                                </button>
+                            </form>
+
+                            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '0.5rem' }}>
+                                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#64748b' }}>
+                                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Teacher Name</th>
+                                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Password</th>
+                                            <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '150px' }}>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {teachersList.map((teacher, idx) => (
+                                            <tr key={teacher.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                                <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
+                                                    {editingTeacherNameId === teacher.id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editedTeacherNameVal}
+                                                            onChange={e => setEditedTeacherNameVal(e.target.value)}
+                                                            style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
+                                                        />
+                                                    ) : (
+                                                        teacher.name
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '0.75rem 1rem' }}>
+                                                    {editingTeacherNameId === teacher.id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editedTeacherPasswordVal}
+                                                            onChange={e => setEditedTeacherPasswordVal(e.target.value)}
+                                                            style={{ padding: '0.4rem', borderRadius: '0.3rem', border: '1px solid #cbd5e1', width: '100%', outline: 'none' }}
+                                                        />
+                                                    ) : (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <span style={{ fontFamily: 'monospace', letterSpacing: '0.1em', color: revealedPasswords.has(teacher.name) ? '#334155' : '#94a3b8' }}>
+                                                                {revealedPasswords.has(teacher.name) ? (teacher.password || '—') : '••••••'}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setRevealedPasswords(prev => {
+                                                                    const next = new Set(prev);
+                                                                    if (next.has(teacher.name)) next.delete(teacher.name);
+                                                                    else next.add(teacher.name);
+                                                                    return next;
+                                                                })}
+                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex', alignItems: 'center' }}
+                                                            >
+                                                                {revealedPasswords.has(teacher.name) ? 'Hide' : 'Show'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                                    {editingTeacherNameId === teacher.id ? (
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <button
+                                                                onClick={() => handleSaveTeacherEdit(teacher)}
+                                                                style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer' }}
+                                                                title="Save"
+                                                            >
+                                                                ✓
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingTeacherNameId(null)}
+                                                                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                                                                title="Cancel"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingTeacherNameId(teacher.id);
+                                                                    setEditedTeacherNameVal(teacher.name);
+                                                                    setEditedTeacherPasswordVal(teacher.password);
+                                                                }}
+                                                                style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }}
+                                                                title="Edit Teacher"
+                                                            >
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteTeacher(teacher.name)}
+                                                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+                                                                title="Delete Teacher"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── DELETE FEEDBACK MODAL ── */}
                 {feedbackToDelete !== null && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -2074,6 +2905,97 @@ export default function TeacherDashboard() {
                                 </button>
                                 <button onClick={executeDeleteFeedback} style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '0.5rem', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
                                     Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── DELETE MAPPING CONFIRMATION MODAL ── */}
+                {mappingToDelete !== null && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                        <div style={{ background: '#fff', padding: '2rem', borderRadius: '1rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                <div style={{ background: '#fee2e2', color: '#ef4444', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"></path></svg>
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b', fontFamily: 'Outfit, sans-serif' }}>Remove Mapping</h3>
+                            </div>
+                            <p style={{ color: '#475569', fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                                Are you sure you want to remove the mapping <strong>{mappingToDelete.className.replace('Class_', '')} - {mappingToDelete.subject}</strong> for <strong>{mappingToDelete.teacherUsername}</strong>?
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                                <button onClick={() => setMappingToDelete(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>
+                                    Cancel
+                                </button>
+                                <button onClick={confirmDeleteMapping} style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '0.5rem', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add Class Modal */}
+                {showAddClassModal && (
+                    <div
+                        style={{
+                            position: 'fixed', inset: 0, zIndex: 3000,
+                            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '1rem', backdropFilter: 'blur(4px)',
+                        }}
+                        onClick={e => { if (e.target === e.currentTarget) setShowAddClassModal(false); }}
+                    >
+                        <div style={{
+                            background: '#fff', borderRadius: '1rem',
+                            padding: '2rem', width: '100%', maxWidth: '400px',
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+                        }}>
+                            <h3 style={{ margin: '0 0 1rem', fontSize: '1.2rem', fontWeight: 700, color: '#1e293b', fontFamily: 'Outfit, sans-serif' }}>Add New Class</h3>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Class Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. 11_A"
+                                    value={newClassNameModalInput}
+                                    onChange={e => setNewClassNameModalInput(e.target.value)}
+                                    style={{ width: '100%', padding: '0.65rem 0.85rem', border: '1.5px solid #e2e8f0', borderRadius: '0.6rem', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                                <button
+                                    onClick={() => { setShowAddClassModal(false); setNewClassNameModalInput(''); }}
+                                    style={{ padding: '0.65rem 1.25rem', border: '1.5px solid #e2e8f0', borderRadius: '0.6rem', background: '#fff', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (newClassNameModalInput.trim()) {
+                                            const formattedClass = newClassNameModalInput.trim().toUpperCase().startsWith('CLASS_') ? newClassNameModalInput.trim() : `Class_${newClassNameModalInput.trim()}`;
+                                            if (!classes.includes(formattedClass)) {
+                                                setClasses([...classes, formattedClass]);
+                                                setSelectedClass(formattedClass);
+                                                setNewClassNameModalInput('');
+                                                setShowAddClassModal(false);
+                                                toast.success('Class added locally! Add a student to save it permanently.');
+                                            } else {
+                                                toast.error('Class already exists');
+                                            }
+                                        }
+                                    }}
+                                    disabled={!newClassNameModalInput.trim()}
+                                    style={{
+                                        padding: '0.65rem 1.5rem',
+                                        background: !newClassNameModalInput.trim() ? '#c4b5fd' : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                                        color: '#fff', border: 'none', borderRadius: '0.6rem',
+                                        fontWeight: 700, fontSize: '0.9rem',
+                                        cursor: !newClassNameModalInput.trim() ? 'not-allowed' : 'pointer',
+                                        fontFamily: 'Outfit, sans-serif'
+                                    }}
+                                >
+                                    Add Class
                                 </button>
                             </div>
                         </div>

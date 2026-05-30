@@ -50,7 +50,7 @@ export default function StudentDashboardView({
 
             const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
             const requiredSubjects = is11Or12 
-                ? ['Maths', 'Physics', 'Chemistry', 'Total']
+                ? ['Maths', 'Physics', 'Chemistry', 'Combined']
                 : ['Maths', 'Physics', 'Chemistry', 'Biology'];
             const allSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
 

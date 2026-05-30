@@ -45,7 +45,7 @@ function DashboardContent() {
     const fetchData = useCallback(async () => {
         try {
             let studentToFetch = session?.user?.name;
-            if (session?.user?.role === 'teacher' && studentParam) {
+            if ((session?.user?.role === 'teacher' || session?.user?.role === 'admin') && studentParam) {
                 studentToFetch = studentParam;
             }
 
@@ -57,10 +57,10 @@ function DashboardContent() {
             setData(safeData);
 
             const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
-            const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Combined'];
             const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
 
-            const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Total'];
+            const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Combined'];
             const sortedSubjects = uniqueSubjects.sort((a, b) => {
                 const idxA = sortOrder.indexOf(a);
                 const idxB = sortOrder.indexOf(b);
@@ -87,7 +87,7 @@ function DashboardContent() {
     useEffect(() => {
         if (status === 'loading') return;
 
-        if (session?.user?.role === 'teacher') {
+        if (session?.user?.role === 'teacher' || session?.user?.role === 'admin') {
             if (!studentParam) {
                 router.push('/teacher');
                 return;
@@ -142,13 +142,13 @@ function DashboardContent() {
     if (!session) return null;
 
     const subjectData = data.filter(d => d.subject === activeSubject);
-    const displayedStudentName = (session.user.role === 'teacher' && studentParam) ? studentParam : session.user.name;
+    const displayedStudentName = ((session.user.role === 'teacher' || session.user.role === 'admin') && studentParam) ? studentParam : session.user.name;
 
     return (
         <>
             <Header />
             <main className="container">
-                {session.user.role === 'teacher' && (
+                {(session.user.role === 'teacher' || session.user.role === 'admin') && (
                     <button onClick={() => router.push('/teacher')} className="back-button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -194,7 +194,7 @@ function DashboardContent() {
                             <h3 className="card-title text-lg mb-4">Detailed Report</h3>
                             <PerformanceTable
                                 data={subjectData}
-                                editable={session.user.role === 'teacher'}
+                                editable={session.user.role === 'teacher' || session.user.role === 'admin'}
                                 studentName={displayedStudentName || ''}
                                 onRefreshRequested={fetchData}
                             />
