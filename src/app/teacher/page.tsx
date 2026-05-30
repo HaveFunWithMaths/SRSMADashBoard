@@ -250,31 +250,24 @@ export default function TeacherDashboard() {
     }, [isRegularTeacher]);
 
     const fetchTeachersAndMappings = useCallback(async () => {
-        console.log("[Client Debug] fetchTeachersAndMappings triggered. isRegularTeacher:", isRegularTeacher, "session:", session);
         if (!isRegularTeacher) {
             try {
                 const res = await fetch('/api/admin/teachers');
-                console.log("[Client Debug] fetchTeachersAndMappings response status:", res.status);
                 if (!res.ok) {
                     const data = await res.json();
-                    console.error('[Client Debug] fetchTeachersAndMappings error response:', data);
                     toast.error(`Failed to load teachers: ${data.error || 'Server error'}`);
                     return;
                 }
                 const data = await res.json();
-                console.log("[Client Debug] fetchTeachersAndMappings success response:", data);
                 if (data) {
                     if (Array.isArray(data.teachers)) setTeachersList(data.teachers);
                     if (Array.isArray(data.mappings)) setTeacherMappings(data.mappings);
                 }
             } catch (err) {
-                console.error('[Client Debug] Error fetching teachers and mappings:', err);
                 toast.error('Network error loading teachers');
             }
-        } else {
-            console.log("[Client Debug] Skipping fetchTeachersAndMappings because user is regular teacher.");
         }
-    }, [isRegularTeacher, session]);
+    }, [isRegularTeacher]);
 
     useEffect(() => {
         fetchTeacherPermissions();
@@ -458,6 +451,7 @@ export default function TeacherDashboard() {
 
     useEffect(() => {
         if (!selectedClass) return;
+        setSelectedSubject('');
         fetch(`/api/data?type=subjects&class=${encodeURIComponent(selectedClass)}`)
             .then(res => res.json())
             .then(data => {
@@ -820,6 +814,12 @@ export default function TeacherDashboard() {
     const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Auto-populate topic name from the file name (without extension)
+        const fileName = file.name;
+        const topicNameFromFileName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+        setUploadTopicName(topicNameFromFileName);
+
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {

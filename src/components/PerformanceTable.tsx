@@ -41,10 +41,9 @@ export default function PerformanceTable({
     // But props data is likely chronologically sorted for charts.
     // We should clone and sort for table.
     const sortedData = [...data].sort((a, b) => {
-        // Handle null marks (Absent) to be at bottom
-        if (a.marks === null) return 1;
-        if (b.marks === null) return -1;
-        return b.marks - a.marks;
+        if (a.percentage === null || a.percentage === undefined) return 1;
+        if (b.percentage === null || b.percentage === undefined) return -1;
+        return b.percentage - a.percentage;
     });
 
     useEffect(() => {

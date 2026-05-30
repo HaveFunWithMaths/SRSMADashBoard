@@ -56,11 +56,22 @@ function DashboardContent() {
             const safeData: StudentPerformanceRecord[] = Array.isArray(jsonData) ? jsonData : [];
             setData(safeData);
 
+            // Determine if the student is in Class 11 or 12
+            let is11Or12 = true;
+            if (safeData.length > 0 && safeData[0].className) {
+                is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(safeData[0].className);
+            } else if (session?.user?.class) {
+                const cleanedClass = String(session.user.class).replace(/^Class_/i, '');
+                is11Or12 = ['11', '12', '12+'].includes(cleanedClass);
+            }
+
             const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
-            const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Combined'];
+            const requiredSubjects = is11Or12
+                ? ['Maths', 'Physics', 'Chemistry', 'Combined']
+                : ['Maths', 'Physics', 'Chemistry', 'Biology'];
             const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
 
-            const sortOrder = ['Maths', 'Physics', 'Chemistry', 'Combined'];
+            const sortOrder = requiredSubjects;
             const sortedSubjects = uniqueSubjects.sort((a, b) => {
                 const idxA = sortOrder.indexOf(a);
                 const idxB = sortOrder.indexOf(b);

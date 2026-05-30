@@ -1,7 +1,7 @@
 'use client';
 
 import { signOut, useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, LayoutDashboard, Bell } from 'lucide-react';
@@ -12,6 +12,19 @@ export default function Header() {
     const router = useRouter();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [showNotifications, setShowNotifications] = useState(false);
+    const notificationsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+                setShowNotifications(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
         if (session?.user?.role === 'student') {
@@ -51,7 +64,7 @@ export default function Header() {
                 {session && (
                     <div className="user-nav">
                         {session.user?.role === 'student' && (
-                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <div ref={notificationsRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <button
                                     onClick={() => {
                                         setShowNotifications(!showNotifications);

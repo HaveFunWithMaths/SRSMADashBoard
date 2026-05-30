@@ -10,12 +10,6 @@ function mapRowToUser(row: any): User {
     let mappedRole: 'student' | 'teacher' | 'admin' = 'student';
     if (role === 'student' || role === 'teacher' || role === 'admin') {
         mappedRole = role;
-    } else {
-        // Heuristic fallback
-        const u = String(row.name || row.username || '').toLowerCase();
-        if (u === 'srsma') mappedRole = 'teacher';
-        else if (u.includes('admin')) mappedRole = 'admin';
-        else if (u.includes('teacher')) mappedRole = 'teacher';
     }
 
     const resolvedName = String(row.name || '').trim();
@@ -44,7 +38,7 @@ export async function getUsersFromDB(): Promise<User[]> {
         return rows.map(mapRowToUser).filter(u => u.name && u.password);
     } catch (err) {
         console.error('DB getUsersFromDB failed:', err);
-        return [];
+        throw new Error('Database connection failed. Please contact the administrator.');
     }
 }
 
@@ -56,6 +50,16 @@ export async function getAllDataFromDB(): Promise<Record<string, SubjectData[]>>
         const rows = await getPerformanceDataFromDB();
         const result: Record<string, SubjectData[]> = {};
 
+        // Fetch users to map student name -> roll number (username)
+        const users = await getUsersFromDB();
+        const studentNameToRollNo = new Map<string, string>();
+        for (const u of users) {
+            if (u.role === 'student' && u.class) {
+                const folderClass = `Class_${u.class}`;
+                studentNameToRollNo.set(`${folderClass}|${u.name}`, u.username);
+            }
+        }
+
         const topicMap = new Map<string, TopicData>();
 
         for (const row of rows) {
@@ -65,7 +69,7 @@ export async function getAllDataFromDB(): Promise<Record<string, SubjectData[]>>
             const totalMarks = Number(row.total_marks);
             const testDate = row.test_date instanceof Date ? row.test_date.toISOString() : new Date(row.test_date).toISOString();
             
-            const topicKey = `${className}|${subject}|${topicName}`;
+            const topicKey = JSON.stringify({ className, subject, topicName });
             
             if (!topicMap.has(topicKey)) {
                 topicMap.set(topicKey, {
@@ -77,15 +81,17 @@ export async function getAllDataFromDB(): Promise<Record<string, SubjectData[]>>
             }
             
             const topic = topicMap.get(topicKey)!;
+            const rollNo = studentNameToRollNo.get(`${className}|${row.student_name}`) || '';
             topic.students.push({
                 name: row.student_name,
+                rollNo,
                 marks: row.marks !== null ? Number(row.marks) : null,
                 comments: row.comments
             });
         }
 
         for (const [key, rawTopic] of topicMap.entries()) {
-            const [className, subjectName] = key.split('|');
+            const { className, subject: subjectName } = JSON.parse(key);
             
             if (!result[className]) result[className] = [];
             
@@ -105,14 +111,18 @@ export async function getAllDataFromDB(): Promise<Record<string, SubjectData[]>>
     }
 }
 
-export async function getStudentDataFromDB(studentName: string) {
+export async function getStudentDataFromDB(studentRollOrName: string) {
     const allData = await getAllDataFromDB();
     const studentPerformance: any[] = [];
+    const searchKey = studentRollOrName.toLowerCase().trim();
 
     Object.values(allData).forEach(subjects => {
         subjects.forEach(subject => {
             subject.topics.forEach(topic => {
-                const studentRecord = topic.students.find(s => s.name.toLowerCase().trim() === studentName.toLowerCase().trim());
+                const studentRecord = topic.students.find(s => 
+                    (s.rollNo && s.rollNo.toLowerCase().trim() === searchKey) ||
+                    (s.name.toLowerCase().trim() === searchKey)
+                );
                 if (studentRecord) {
                     studentPerformance.push({
                         ...studentRecord,

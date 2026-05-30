@@ -20,7 +20,7 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
         rank: d.rank ?? null
     }));
 
-    const maxTopicLength = Math.max(...data.map(d => d.topic ? d.topic.length : 0), 10);
+    const maxTopicLength = Math.max(...data.map(d => (d && typeof d.topic === 'string') ? d.topic.length : 0), 10);
     const xAxisHeight = Math.min(Math.max(60, maxTopicLength * 4), 120);
 
     return (
@@ -58,7 +58,7 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
                         strokeWidth={3}
                         dot={{ r: 4, fill: subjectColor, strokeWidth: 2 }}
                         activeDot={{ r: 6 }}
-                        connectNulls // Connect points if rank is missing? Or leave gap? Plan says "Absent = null". Better to leave gap to show absence. 
+                        connectNulls={false} // Connect points if rank is missing? Or leave gap? Plan says "Absent = null". Better to leave gap to show absence. 
                     // Actually, for trend, gaps are better. connectNulls={false} is default.
                     />
                 </LineChart>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { updatePerformanceEntry, addNotification, isTeacherMapped } from '@/lib/db';
+import { updatePerformanceEntry, addNotification, isTeacherMapped, getStudentRollNo } from '@/lib/db';
 
 export async function PATCH(request: Request) {
     const session = await getServerSession(authOptions);
@@ -50,7 +50,10 @@ export async function PATCH(request: Request) {
                 );
 
                 if (marksValue !== null) {
-                    await addNotification(String(studentName), `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
+                    const rollNo = await getStudentRollNo(String(studentName), String(className));
+                    if (rollNo) {
+                        await addNotification(rollNo, `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
+                    }
                 }
             }
             return NextResponse.json({ success: true, message: 'All performance entries updated successfully' });
@@ -99,7 +102,10 @@ export async function PATCH(request: Request) {
         }
 
         if (marksValue !== null) {
-            await addNotification(String(studentName), `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
+            const rollNo = await getStudentRollNo(String(studentName), String(className));
+            if (rollNo) {
+                await addNotification(rollNo, `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
+            }
         }
 
         return NextResponse.json({ success: true, message: 'Performance updated successfully' });

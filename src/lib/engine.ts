@@ -26,27 +26,28 @@ export function calculateRanks(students: StudentRecord[]): StudentRecord[] {
 
     const rankedStudents = [...students];
 
-    // Create a map of name -> rank
+    // Create a map of rollNo (or name if rollNo missing) -> rank
     const rankMap = new Map<string, number>();
 
-    let currentRank = 1;
     for (let i = 0; i < validStudents.length; i++) {
         const student = validStudents[i];
+        const key = student.rollNo || student.name;
         // If tie with previous student, use same rank
         if (i > 0 && student.marks === validStudents[i - 1].marks) {
-            rankMap.set(student.name, rankMap.get(validStudents[i - 1].name)!);
+            const prevKey = validStudents[i - 1].rollNo || validStudents[i - 1].name;
+            rankMap.set(key, rankMap.get(prevKey)!);
         } else {
-            rankMap.set(student.name, i + 1); // Rank is 1-based index in sorted array (standard competition)
+            rankMap.set(key, i + 1); // Rank is 1-based index in sorted array (standard competition)
         }
     }
 
-    // Apply ranks to original list (preserving order? No, likely just map values)
-    // Actually, let's return a new list with ranks set
+    // Apply ranks to original list
     return rankedStudents.map(s => {
         if (s.marks === null) {
             return { ...s, rank: null };
         }
-        return { ...s, rank: rankMap.get(s.name) ?? null };
+        const key = s.rollNo || s.name;
+        return { ...s, rank: rankMap.get(key) ?? null };
     });
 }
 

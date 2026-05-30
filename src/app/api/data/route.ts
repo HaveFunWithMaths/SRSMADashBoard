@@ -80,15 +80,11 @@ export async function GET(request: Request) {
                 return NextResponse.json({ error: 'Forbidden: Access denied to other student data' }, { status: 403 });
             }
 
-            // Always look up by the real student name for performance data.
-            // If the student param is the roll number, resolve it to the real name first.
-            let studentNameToFetch = student;
-            if (sessionUsername && student.toLowerCase().trim() === sessionUsername.toLowerCase().trim()) {
-                // Student passed their roll number — use the real name from the session instead.
-                studentNameToFetch = sessionName;
-            }
+            // Always look up by the sessionUsername (roll number) if the user is a student, 
+            // otherwise use the student parameter (which could be roll number or name).
+            const searchIdentifier = (userRole === 'student' && sessionUsername) ? sessionUsername : student;
 
-            const data = await getStudentDataFromDB(studentNameToFetch);
+            const data = await getStudentDataFromDB(searchIdentifier);
             return NextResponse.json(data);
         }
 

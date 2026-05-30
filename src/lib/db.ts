@@ -200,8 +200,7 @@ export async function getAllUsers(): Promise<DBUser[]> {
     return rows as DBUser[];
 }
 
-/** Get students for a specific class (matching folder-style class name like "Class_12+") */
-export async function getStudentsByClass(folderClassName: string): Promise<DBUser[]> {
+export async function getStudentsByClass(folderClassName: string, includeDeleted: boolean = true): Promise<DBUser[]> {
     const possibleValues = folderToExcelClassValues(folderClassName);
     const sql = getSQL();
 
@@ -210,6 +209,7 @@ export async function getStudentsByClass(folderClassName: string): Promise<DBUse
         SELECT * FROM users
         WHERE LOWER(role) = 'student'
           AND class = ANY(${possibleValues})
+          AND (${includeDeleted}::boolean = true OR status != 'Deleted')
         ORDER BY username, name
     `;
     return rows as DBUser[];
@@ -269,6 +269,7 @@ export async function updateStudentDetails(oldUsername: string, newUsername: str
         UPDATE performance_marks
         SET student_name = ${newUsername}
         WHERE student_name = ${oldUsername}
+          AND class_name = ${folderClassName}
     `;
 
     try {
@@ -407,6 +408,7 @@ export async function editClass(oldClassName: string, newClassName: string): Pro
     const sql = getSQL();
     const oldClassRawArray = folderToExcelClassValues(oldClassName);
     const newClassRaw = newClassName.replace(/^Class_/i, '');
+    const resolvedNewClassName = newClassName.startsWith('Class_') ? newClassName : `Class_${newClassName}`;
 
     await sql`
         UPDATE users 
@@ -416,7 +418,13 @@ export async function editClass(oldClassName: string, newClassName: string): Pro
 
     await sql`
         UPDATE performance_marks 
-        SET class_name = ${newClassName} 
+        SET class_name = ${resolvedNewClassName} 
+        WHERE class_name = ${oldClassName}
+    `;
+
+    await sql`
+        UPDATE teacher_mappings
+        SET class_name = ${resolvedNewClassName}
         WHERE class_name = ${oldClassName}
     `;
 }
@@ -425,11 +433,37 @@ export async function deleteClassFromDB(className: string): Promise<void> {
     const sql = getSQL();
     const classRawArray = folderToExcelClassValues(className);
 
+    // Delete feedback for students in the class
+    await sql`
+        DELETE FROM feedback
+        WHERE student_name IN (
+            SELECT name FROM users 
+            WHERE class = ANY(${classRawArray}) AND LOWER(role) = 'student'
+        )
+    `;
+
+    // Delete notifications for students in the class
+    await sql`
+        DELETE FROM notifications
+        WHERE username IN (
+            SELECT username FROM users 
+            WHERE class = ANY(${classRawArray}) AND LOWER(role) = 'student'
+        )
+    `;
+
+    // Delete teacher mappings for the class
+    await sql`
+        DELETE FROM teacher_mappings
+        WHERE class_name = ${className}
+    `;
+
+    // Delete users in the class
     await sql`
         DELETE FROM users 
         WHERE class = ANY(${classRawArray})
     `;
 
+    // Delete performance marks for the class
     await sql`
         DELETE FROM performance_marks 
         WHERE class_name = ${className}
@@ -541,6 +575,14 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
         const useRange = !!(fromDate && toDate);
         const useDays = !!(!useRange && activePeriodDays);
 
+        let days = 0;
+        if (activePeriodDays !== undefined && activePeriodDays !== null) {
+            days = parseInt(String(activePeriodDays), 10);
+            if (isNaN(days) || days < 0) {
+                days = 0;
+            }
+        }
+
         // Last login per user
         const lastLogins = await sql`
             SELECT DISTINCT ON (username) username, name, role, device_type, browser, os, login_time
@@ -549,7 +591,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
               AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
               )
             ORDER BY username, login_time DESC
         `;
@@ -566,7 +608,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
             )
         `;
 
@@ -577,7 +619,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
             )
             GROUP BY device_type
             ORDER BY count DESC
@@ -590,7 +632,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
             )
             GROUP BY browser
             ORDER BY count DESC
@@ -603,7 +645,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
             )
             GROUP BY os
             ORDER BY count DESC
@@ -616,7 +658,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false AND login_time >= NOW() - INTERVAL '30 days') OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
             )
             GROUP BY DATE(login_time)
             ORDER BY date ASC
@@ -755,7 +797,7 @@ export async function addTeacher(name: string, password: string): Promise<void> 
     
     // Check if user already exists
     const existing = await sql`
-        SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedName}) LIMIT 1
+        SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedName}) AND LOWER(role) = 'teacher' LIMIT 1
     `;
     if (existing.length > 0) {
         throw new Error('A user with this name already exists.');
@@ -774,7 +816,7 @@ export async function updateTeacher(oldName: string, newName: string, password?:
     
     if (trimmedOldName.toLowerCase() !== trimmedNewName.toLowerCase()) {
         const existing = await sql`
-            SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedNewName}) LIMIT 1
+            SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedNewName}) AND LOWER(role) = 'teacher' LIMIT 1
         `;
         if (existing.length > 0) {
             throw new Error('A user with this name already exists.');
@@ -903,4 +945,17 @@ export async function isTeacherMapped(teacherUsername: string, className: string
         LIMIT 1
     `;
     return rows.length > 0;
+}
+
+export async function getStudentRollNo(studentName: string, folderClassName: string): Promise<string | null> {
+    const possibleValues = folderToExcelClassValues(folderClassName);
+    const sql = getSQL();
+    const rows = await sql`
+        SELECT username FROM users
+        WHERE name = ${studentName}
+          AND class = ANY(${possibleValues})
+          AND LOWER(role) = 'student'
+        LIMIT 1
+    `;
+    return rows.length > 0 ? rows[0].username : null;
 }

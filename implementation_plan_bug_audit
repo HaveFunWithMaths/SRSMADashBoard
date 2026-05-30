@@ -1,0 +1,402 @@
+# Complete Repository Audit — Functional Bug Report
+
+A comprehensive audit of the SRSMA Student Dashboard codebase, identifying functional bugs especially in edge cases across authentication, data processing, API routes, and UI components.
+
+---
+
+## Critical Bugs 🔴
+
+### BUG-01: Notification system uses `student name` as key, but notifications are sent to `student name` — retrieval uses `session.user.name` which can mismatch
+
+**Files:** [notifications route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/student/notifications/route.ts#L13), [performance route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/data/performance/route.ts#L53), [upload route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/data/upload/route.ts#L47)
+
+When marks are uploaded/updated, notifications are sent using `student.name` (the student's display name). But in the notification retrieval endpoint, we fetch with `session.user.name!`. The `!` non-null assertion is dangerous — if `session.user.name` is somehow null/undefined, this will pass `undefined` to the DB query instead of failing gracefully.
+
+**More importantly:** The `addNotification` call uses the **student name from the performance data** (e.g. `"Ravi Kumar"`), but `markNotificationAsReadById` and `getUnreadNotifications` use `session.user.name`. If the student's name in performance_marks doesn't exactly match `users.name` (case, whitespace), notifications will be **orphaned** — created but never retrievable.
+
+**Edge case:** If a teacher renames a student via `updateStudentDetails`, the `performance_marks.student_name` is updated but **existing notifications** with the old name are NOT migrated (only `notifications.username` is updated in `updateStudentDetails`). However, future notifications from performance edits will use the new `student_name`, while the notification lookup uses `session.user.name` which comes from `users.name`. If these diverge, notifications break.
+
+---
+
+### BUG-02: `updateStudentDetails` cannot clear email — empty string treated as "keep existing"
+
+**File:** [db.ts#L254-L261](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L254-L261)
+
+```typescript
+const emailVal = email !== undefined ? email : null;
+// ...
+email = CASE WHEN ${emailVal}::text IS NOT NULL THEN ${emailVal}::text ELSE email END
+```
+
+The comment says *"so that empty strings can overwrite existing values (allowing the teacher to clear them)"*, but the SQL `CASE WHEN ${emailVal}::text IS NOT NULL` will be true for empty string `""`, so empty string **does** overwrite. But if `email` is passed as `null` explicitly, the CASE falls through to `ELSE email`, keeping the existing value. This is confusing but **technically works for empty string**. However, the real problem is that passing `email: null` (meaning "I want to set it to null") is impossible — it always keeps the old value. There's no way to **actually clear** the email to NULL in the database.
+
+---
+
+### BUG-03: `editClass` inconsistently updates `users.class` vs `performance_marks.class_name`
+
+**File:** [db.ts#L406-L422](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L406-L422)
+
+```typescript
+const newClassRaw = newClassName.replace(/^Class_/i, '');
+await sql`UPDATE users SET class = ${newClassRaw} WHERE class = ANY(${oldClassRawArray})`;
+await sql`UPDATE performance_marks SET class_name = ${newClassName} WHERE class_name = ${oldClassName}`;
+```
+
+Users table stores the **raw** class value (e.g. `"12+"`), while `performance_marks` stores the **folder-style** name (e.g. `"Class_12+"`). When renaming, the users table is updated with the raw stripped value, but the performance_marks table is updated with the full `Class_` prefixed value. This is correct **only if** the old and new names both use the `Class_` prefix convention. If someone renames a class to something without `Class_` prefix, or if the DB already has inconsistent data, this will break lookups.
+
+> [!IMPORTANT]
+> The function also doesn't update `teacher_mappings.class_name`, so renaming a class **orphans all teacher mappings** for that class.
+
+---
+
+### BUG-04: `deleteClassFromDB` doesn't clean up `teacher_mappings` or `notifications`
+
+**File:** [db.ts#L424-L437](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L424-L437)
+
+When a class is deleted, only `users` and `performance_marks` are cleaned up. The `teacher_mappings` table still references the deleted class, and `notifications` / `feedback` related to students of that class remain as orphaned data.
+
+---
+
+### BUG-05: `folderToExcelClassValues` doesn't handle common class name variants
+
+**File:** [db.ts#L713-L718](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L713-L718)
+
+```typescript
+function folderToExcelClassValues(folderName: string): string[] {
+    let raw = folderName.replace(/^Class_/i, '');
+    const values: string[] = [raw];
+    values.push(raw.toLowerCase(), raw.toUpperCase());
+    return [...new Set(values)];
+}
+```
+
+For `Class_12+`, this generates `["12+", "12+", "12+"]` (since `"12+".toLowerCase() === "12+"` and `"12+".toUpperCase() === "12+"`). It does NOT handle Roman numerals (`XII`, `xii`), numeric-only (`12`), or space variants (`12 +`). If any student's `class` field in the DB is stored differently (e.g. `"Class 12+"` vs `"12+"` vs `"XII"`), the lookup will fail silently.
+
+---
+
+## High-Severity Bugs 🟠
+
+### BUG-06: Login log API has **no authentication** — anyone can log fake login events
+
+**File:** [log-login route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/analytics/log-login/route.ts)
+
+The `/api/analytics/log-login` POST endpoint has **zero** authentication checks. Any unauthenticated user can send arbitrary login events with any username, polluting analytics data. An attacker could flood the `user_login_logs` table.
+
+---
+
+### BUG-07: Admin page has no server-side role check — any authenticated user can access `/admin`
+
+**File:** [admin page](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/admin/page.tsx)
+
+The admin page only checks `status === 'unauthenticated'` and redirects to login. There is **no role check**. A logged-in student can navigate to `/admin` and see the admin panel. The page doesn't show sensitive data currently, but it's an access control gap. The middleware only checks authentication, not authorization.
+
+---
+
+### BUG-08: `getMaxRollSequence` has fragile roll number parsing — can generate duplicates
+
+**File:** [db.ts#L327-L357](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L327-L357)
+
+The function tries to find the max roll sequence by parsing the last 2 digits. For class `Class_12+`:
+- `classPrefix = "12+"`  
+- It checks `roll.startsWith("12+")` but roll numbers use the format `26{classPrefix}{seq}` (e.g. `2612+01`)
+
+The `+` in `"12+"` can cause issues with string matching. Also, if a student has a roll number that coincidentally ends with digits (e.g. transferred students with different formats), this will produce wrong maxSeq, potentially **generating a duplicate roll number** that violates a unique constraint, causing a silent failure with no error reported to the user.
+
+---
+
+### BUG-09: `RankTrendChart` has `connectNulls` prop — but the comment says it shouldn't
+
+**File:** [RankTrendChart.tsx#L61](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/components/RankTrendChart.tsx#L61)
+
+```tsx
+connectNulls // Connect points if rank is missing? Or leave gap? ...
+// Actually, for trend, gaps are better. connectNulls={false} is default.
+```
+
+The comment says gaps are better, but `connectNulls` (without `={false}`) is a **truthy boolean prop**, meaning it evaluates to `true`. This **connects** null gaps in the chart, contradicting the developer's intention.
+
+---
+
+### BUG-10: `PerformanceChart` crashes on empty data array
+
+**File:** [PerformanceChart.tsx#L16](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/components/PerformanceChart.tsx#L16)
+
+```typescript
+const maxTopicLength = Math.max(...data.map(d => d.topic ? d.topic.length : 0), 10);
+```
+
+If `data` is an empty array, `Math.max(...[])` returns `-Infinity`, but the `,10` fallback saves it. However, if `data` contains items where `topic` is `undefined`, `d.topic.length` will throw. The guard `d.topic ?` only handles falsy topics. This same pattern exists in [RankTrendChart.tsx#L23](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/components/RankTrendChart.tsx#L23).
+
+---
+
+### BUG-11: `calculateRanks` has a duplicate name collision bug
+
+**File:** [engine.ts#L20-L51](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/engine.ts#L20-L51)
+
+```typescript
+const rankMap = new Map<string, number>();
+// ...
+rankMap.set(student.name, ...);
+```
+
+If two students have the **exact same name** (which is plausible in Indian schools, e.g. two "Ravi Kumar" in the same class), the `Map` key collision means the second student's rank **overwrites** the first. The `rankedStudents.map` then assigns the same rank to both, which may be wrong if they have different marks. The root issue is using `name` as a unique key when names are not unique.
+
+> [!WARNING]  
+> This also affects the performance data lookup in `parser.ts#L115` which uses `s.name.toLowerCase().trim()` — if two students share a name, only the **first** match is returned, and one student's data is silently lost.
+
+---
+
+### BUG-12: Dashboard hardcodes subject tabs `['Maths', 'Physics', 'Chemistry', 'Combined']` for all students
+
+**File:** [dashboard page.tsx#L60-L61](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/dashboard/page.tsx#L60-L61)
+
+```typescript
+const requiredSubjects = ['Maths', 'Physics', 'Chemistry', 'Combined'];
+```
+
+This is hardcoded regardless of the student's class. Students in Class 8, 9, or 10 should see `Biology` instead of `Combined`. The teacher page correctly checks `is11Or12` for this, but the student dashboard does not.
+
+---
+
+### BUG-13: Password exposed in GET response of students API
+
+**File:** [students route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/admin/students/route.ts#L31-L37)
+
+```typescript
+return NextResponse.json(students.map(u => ({
+    username: u.name,
+    rollNo: u.username || '',
+    status: u.status || 'Active',
+    email: u.email || '',
+    password: u.password || ''  // ← EXPOSING PASSWORDS
+})));
+```
+
+Student passwords (potentially bcrypt hashes or plaintext) are returned in the API response. While the endpoint requires teacher/admin auth, this is still a security concern — passwords should **never** be returned in API responses. Similarly, the teachers API at [teachers route#L32](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/admin/teachers/route.ts#L32) also exposes teacher passwords.
+
+---
+
+### BUG-14: `addTeacher` checks `LOWER(username)` for uniqueness, but teachers can share names with students
+
+**File:** [db.ts#L752-L768](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L752-L768)
+
+The uniqueness check `SELECT 1 FROM users WHERE LOWER(username) = LOWER(${trimmedName})` will prevent adding a teacher if ANY user (student or teacher) has that username. But the unique constraint on the `users` table is `UNIQUE(name, class)`, and teachers have `class = null`. So two teachers could theoretically have the same name (since `NULL != NULL` in SQL), but the code's pre-check prevents it. However, a teacher named "2601" (same as a student's roll number) **would be blocked**, which may be unexpected.
+
+---
+
+## Medium-Severity Bugs 🟡
+
+### BUG-15: `updateStudentDetails` updates ALL `performance_marks` rows across ALL classes
+
+**File:** [db.ts#L268-L272](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L268-L272)
+
+```typescript
+await sql`
+    UPDATE performance_marks
+    SET student_name = ${newUsername}
+    WHERE student_name = ${oldUsername}
+`;
+```
+
+This updates performance marks across **all classes**, not just the student's class. If two students in different classes happen to share the same name and one is renamed, the **other student's performance records are corrupted**.
+
+---
+
+### BUG-16: `getAllClasses` returns class values from ALL users including Deleted ones
+
+**File:** [db.ts#L376-L382](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L376-L382)
+
+```typescript
+const rows = await sql`SELECT DISTINCT class FROM users WHERE class IS NOT NULL`;
+```
+
+No filter on `status != 'Deleted'`. If all students in a class are soft-deleted, that class still appears in the dropdown, but has no accessible data.
+
+---
+
+### BUG-17: `getStudentsByClass` returns ALL students (including Deleted) with no status filter
+
+**File:** [db.ts#L204-L216](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L204-L216)
+
+The function does filter by role=student and class, but does **not** filter by `status`. The API route at [students route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/admin/students/route.ts) passes all students to the frontend, which handles the deleted filter in the UI. This is intentional for the "Class Manager" view (to show deleted students with a restore option), but means the **upload tab** gets all students including deleted ones (though it filters by `status !== 'Deleted'` on the client). This is fine but wasteful.
+
+---
+
+### BUG-18: `topicKey` splitting is brittle — subject/topic names with `|` character break parsing
+
+**File:** [parser.ts#L68-L88](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/parser.ts#L68-L88)
+
+```typescript
+const topicKey = `${className}|${subject}|${topicName}`;
+// ...
+const [className, subjectName] = key.split('|');
+```
+
+If a topic name or subject name contains the pipe `|` character, the split produces wrong values. The destructuring `[className, subjectName]` would get incorrect values, and the topicName would be truncated.
+
+---
+
+### BUG-19: Plaintext password comparison is case-sensitive and timing-unsafe  
+
+**File:** [auth.ts#L63](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/auth.ts#L63)
+
+```typescript
+isValid = user.password === credentials.password;
+```
+
+For non-bcrypt passwords, this does a direct string comparison. This is vulnerable to **timing attacks** (though low-risk for this app). More importantly, if users set passwords with trailing whitespace, this comparison will succeed, but after a future bcrypt migration, the password may fail (since bcrypt hashing may or may not preserve trailing whitespace depending on the hashing flow).
+
+---
+
+### BUG-20: `getLoginStats` has SQL injection-like risk in interval construction
+
+**File:** [db.ts#L552](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/db.ts#L552)
+
+```sql
+login_time >= NOW() - (${activePeriodDays || 0} || ' days')::INTERVAL
+```
+
+While Neon's tagged template literals parameterize values, the `|| ' days'` concatenation happens **in SQL**, which means `activePeriodDays` is treated as a parameter. However, if `activePeriodDays` is a negative number or non-integer (from a crafted query string), this could produce unexpected behavior in the interval calculation. The API endpoint parses it with `parseInt` which mitigates most issues, but `NaN` would still pass through as `0`.
+
+---
+
+### BUG-21: `PerformanceTable` sorting puts ALL absent students at the bottom regardless of chronology
+
+**File:** [PerformanceTable.tsx#L43-L48](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/components/PerformanceTable.tsx#L43-L48)
+
+```typescript
+const sortedData = [...data].sort((a, b) => {
+    if (a.marks === null) return 1;
+    if (b.marks === null) return -1;
+    return b.marks - a.marks;
+});
+```
+
+The comment says "Default sorted by Marks (Descending)" and "props data is likely chronologically sorted for charts." The table sorts by raw marks value (not percentage), meaning a score of 50/100 ranks higher than 45/50 (90%), which is misleading for a "performance" view.
+
+---
+
+### BUG-22: Teacher page never resets `selectedSubject` when switching classes
+
+**File:** [teacher page.tsx#L459-L499](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/teacher/page.tsx#L459-L499)
+
+When the user changes `selectedClass`, the `useEffect` at line 459 fetches new subjects. It sets `selectedSubject` to the first available subject. However, there's a brief moment where `selectedSubject` still holds the old value while the new subjects are loading, which triggers `refreshBatchData` (useEffect at line 501-504) with the **old subject** for the **new class**, causing a wasted API call that may return empty data and flash an empty state.
+
+---
+
+### BUG-23: `handleExcelUpload` doesn't validate `topicName` from the uploaded file
+
+**File:** [teacher page.tsx#L820-L854](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/teacher/page.tsx#L820-L854)
+
+When uploading an Excel file, the function reads Date and Total Marks from the first row, but **does not** set `uploadTopicName` from the file. The topic name must be manually entered. If the user forgets to enter a topic name, the form validation at line 650 (`!uploadTopicName`) catches it, but the user experience is confusing — they'd expect the Excel to populate all fields.
+
+---
+
+### BUG-24: `calculatePercentage` returns `null` when `totalMarks === 0` — but 0 total marks is never validated on upload
+
+**File:** [engine.ts#L9](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/engine.ts#L9)
+
+While `totalMarks === 0` correctly returns null to avoid division by zero, the upload endpoint at [upload route](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/data/upload/route.ts#L17) validates `typeof totalMarks !== 'number'` but **doesn't check for zero**. A topic with `totalMarks = 0` would be saved successfully, and then all percentage calculations for that topic would return null, showing every student as "absent" in percentage displays.
+
+The topic edit validation at [topic route#L39](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/admin/topic/route.ts#L39) does check `totalMarksNum <= 0`, but the upload endpoint does not.
+
+---
+
+### BUG-25: `engine.ts` `currentRank` variable declared but never used
+
+**File:** [engine.ts#L32](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/engine.ts#L32)
+
+```typescript
+let currentRank = 1;  // ← never used or incremented
+```
+
+This is dead code, which suggests the ranking algorithm was refactored but not cleaned up. The ranking logic at line 39 uses `i + 1` directly, which is correct for standard competition ranking.
+
+---
+
+## Low-Severity / Code Quality Issues 🟢
+
+### BUG-26: Debug `console.log` left in production auth code
+
+**File:** [auth.ts#L33](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/auth.ts#L33)
+
+```typescript
+console.log("Auth Debug: NEXTAUTH_SECRET is set?", !!process.env.NEXTAUTH_SECRET);
+```
+
+This leaks configuration state information to server logs on every module load.
+
+---
+
+### BUG-27: Multiple debug `console.log` statements in teacher management flow
+
+**File:** [teacher page.tsx#L253-L276](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/teacher/page.tsx#L253-L276), [teachers route#L17-L19](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/app/api/admin/teachers/route.ts#L17-L19)
+
+Multiple `[Client Debug]` and `Teachers API GET Session` logs are left in production code.
+
+---
+
+### BUG-28: `getUsersFromDB` silently returns empty array on DB error — login silently fails
+
+**File:** [parser.ts#L41-L49](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/parser.ts#L41-L49)
+
+If the database is unreachable, `getUsersFromDB` catches the error and returns `[]`. The auth flow then finds no matching user and returns "Invalid username or password" — indistinguishable from a real auth failure. The teacher/admin has no way to know the DB is down.
+
+---
+
+### BUG-29: `mapRowToUser` heuristic fallback for role detection is fragile
+
+**File:** [parser.ts#L14-L18](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/lib/parser.ts#L14-L18)
+
+```typescript
+if (u === 'srsma') mappedRole = 'teacher';
+else if (u.includes('admin')) mappedRole = 'admin';
+else if (u.includes('teacher')) mappedRole = 'teacher';
+```
+
+If a student has "admin" in their name (e.g. "Adminath"), they'd be assigned the admin role. This heuristic is a fallback for when the `role` field is missing/invalid, but it's dangerous.
+
+---
+
+### BUG-30: Notifications dropdown in Header doesn't close when clicking outside
+
+**File:** [Header.tsx#L77-L120](file:///c:/Users/panga/OneDrive/Desktop/Seva/SRSMA/SRSMADashBoard/src/components/Header.tsx#L77-L120)
+
+The notification dropdown is toggled by clicking the bell icon, but there's no click-outside handler to close it. The user must click the bell icon again to close it, which is poor UX.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Q1:** For BUG-11 (duplicate names), is it possible that two students in the same class share the exact same `name`? The DB constraint is `UNIQUE(name, class)`, which would prevent this. However, if student names differ only by whitespace or case, the constraint won't catch it but the code's `.toLowerCase().trim()` would treat them as identical.
+
+> [!IMPORTANT]
+> **Q2:** For BUG-05 (class name variants), what are the actual class values stored in the DB? Are they always the raw form like `"12+"`, `"11"`, `"10"`, etc.? If so, the helper is adequate for current data, but fragile for future classes.
+
+> [!IMPORTANT]
+> **Q3:** Should I proceed to fix these bugs? If so, which severity level should I target? I'd recommend fixing all Critical and High-severity bugs, and leaving the Low/Medium ones as documented backlog items.
+
+---
+
+## Proposed Fix Priorities
+
+| Priority | Bug IDs | Description |
+|----------|---------|-------------|
+| P0 — Fix now | BUG-03, BUG-04, BUG-06, BUG-09, BUG-12, BUG-15, BUG-24 | Data corruption risks, security holes, wrong UI behavior |
+| P1 — Fix soon | BUG-01, BUG-07, BUG-08, BUG-10, BUG-11, BUG-13, BUG-14 | Edge case crashes, access control gaps, security concerns |
+| P2 — Backlog | BUG-02, BUG-05, BUG-16, BUG-17, BUG-18, BUG-19, BUG-20, BUG-21, BUG-22, BUG-23 | Quality-of-life, edge cases, code quality |
+| P3 — Cleanup | BUG-25, BUG-26, BUG-27, BUG-28, BUG-29, BUG-30 | Dead code, debug logs, UX polish |
+
+## Verification Plan
+
+### Automated Tests
+- After fixing, run `npm run build` to verify no TypeScript compilation errors
+- Test login flow with edge cases (empty credentials, special characters)
+- Test class rename flow to verify teacher mappings are preserved
+
+### Manual Verification
+- Upload marks with `totalMarks = 0` to verify it's now rejected
+- Create two students with similar names to verify ranking
+- Rename a class and verify teacher mappings are preserved
+- Test notification flow end-to-end after student rename

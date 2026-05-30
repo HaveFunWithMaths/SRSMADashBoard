@@ -13,7 +13,7 @@ const SUBJECT_COLORS = COLORS.subjects;
 
 export default function PerformanceChart({ data, subject }: PerformanceChartProps) {
     const subjectColor = SUBJECT_COLORS[subject as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS['default'];
-    const maxTopicLength = Math.max(...data.map(d => d.topic ? d.topic.length : 0), 10);
+    const maxTopicLength = Math.max(...data.map(d => (d && typeof d.topic === 'string') ? d.topic.length : 0), 10);
     const xAxisHeight = Math.min(Math.max(60, maxTopicLength * 4), 120);
 
     return (

@@ -1,6 +1,6 @@
-
 export interface StudentRecord {
     name: string;
+    rollNo?: string;
     marks: number | null; // null indicates "AB" or "ABS" (Absent)
     comments: string | null;
     // Computed fields

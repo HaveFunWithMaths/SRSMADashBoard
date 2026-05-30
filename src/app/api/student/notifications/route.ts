@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     }
 
     try {
-        const notifications = await getUnreadNotifications(session.user.name!);
+        const notifications = await getUnreadNotifications(session.user.username!);
         return NextResponse.json(notifications);
     } catch (e) {
         console.error('Error fetching notifications:', e);
@@ -27,9 +27,9 @@ export async function PATCH(req: Request) {
     try {
         const body = await req.json().catch(() => ({}));
         if (body.id) {
-            await markNotificationAsReadById(body.id, session.user.name!);
+            await markNotificationAsReadById(body.id, session.user.username!);
         } else {
-            await markNotificationsAsRead(session.user.name!);
+            await markNotificationsAsRead(session.user.username!);
         }
         return NextResponse.json({ success: true });
     } catch (e) {

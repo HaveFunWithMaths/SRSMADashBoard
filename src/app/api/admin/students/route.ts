@@ -21,13 +21,14 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const className = searchParams.get('class');
+    const includeDeleted = searchParams.get('includeDeleted') !== 'false';
 
     if (!className) {
         return NextResponse.json({ error: 'Class parameter required' }, { status: 400 });
     }
 
     try {
-        const students = await getStudentsByClass(className);
+        const students = await getStudentsByClass(className, includeDeleted);
         return NextResponse.json(students.map(u => ({
             username: u.name,
             rollNo: u.username || '',

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { savePerformanceData, addNotification, isTeacherMapped } from '@/lib/db';
+import { savePerformanceData, addNotification, isTeacherMapped, getStudentRollNo } from '@/lib/db';
 
 export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
@@ -14,8 +14,8 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { className, subject, topicName, date, totalMarks, students } = body;
 
-        if (!className || !subject || !topicName || !date || typeof totalMarks !== 'number' || !Array.isArray(students)) {
-            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        if (!className || !subject || !topicName || !date || typeof totalMarks !== 'number' || totalMarks <= 0 || !Array.isArray(students)) {
+            return NextResponse.json({ error: 'Invalid payload: totalMarks must be a positive number' }, { status: 400 });
         }
 
         const isRegularTeacher = session.user.role === 'teacher' && session.user.name?.toLowerCase() !== 'srsma';
@@ -44,7 +44,10 @@ export async function POST(request: Request) {
             );
 
             if (marksValue !== null) {
-                await addNotification(student.name, `New marks uploaded for ${subject} - ${topicName}: ${marksValue}/${totalMarks}`);
+                const rollNo = await getStudentRollNo(student.name, className);
+                if (rollNo) {
+                    await addNotification(rollNo, `New marks uploaded for ${subject} - ${topicName}: ${marksValue}/${totalMarks}`);
+                }
             }
         }
 

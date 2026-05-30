@@ -14,9 +14,7 @@ import {
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     
-    console.log("Teachers API GET Session:", session);
     if (!session || (session.user.role !== 'admin' && session.user.name?.toLowerCase() !== 'srsma' && session.user.username?.toLowerCase() !== 'srsma')) {
-        console.log("Teachers API GET: Unauthorized access attempt.", session?.user);
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
