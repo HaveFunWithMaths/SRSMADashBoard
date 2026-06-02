@@ -123,7 +123,7 @@ export async function getStudentDataFromDB(studentRollOrName: string) {
                     (s.rollNo && s.rollNo.toLowerCase().trim() === searchKey) ||
                     (s.name.toLowerCase().trim() === searchKey)
                 );
-                if (studentRecord) {
+                if (studentRecord && studentRecord.marks !== -1) {
                     studentPerformance.push({
                         ...studentRecord,
                         className: subject.className,

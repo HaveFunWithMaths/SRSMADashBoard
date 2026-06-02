@@ -28,9 +28,12 @@ export async function POST(request: Request) {
 
         // Save into PostgreSQL database since filesystem is ephemeral in Vercel.
         for (const student of students) {
-            const marksValue = (student.marks === null || student.marks === undefined || student.marks === '' || Number.isNaN(Number(student.marks))) 
-                ? null 
-                : Number(student.marks);
+            const rawMarks = String(student.marks ?? '').trim().toUpperCase();
+            const marksValue = (rawMarks === 'NA')
+                ? -1
+                : (student.marks === null || student.marks === undefined || student.marks === '' || Number.isNaN(Number(student.marks))) 
+                    ? null 
+                    : Number(student.marks);
                 
             await savePerformanceData(
                 className,
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
                 student.comments || null
             );
 
-            if (marksValue !== null) {
+            if (marksValue !== null && marksValue !== -1) {
                 const rollNo = await getStudentRollNo(student.name, className);
                 if (rollNo) {
                     await addNotification(rollNo, `New marks uploaded for ${subject} - ${topicName}: ${marksValue}/${totalMarks}`);

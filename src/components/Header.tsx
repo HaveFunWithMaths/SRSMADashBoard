@@ -137,6 +137,19 @@ export default function Header() {
                             <span className="user-name" style={{ fontSize: '0.9rem' }}>{session.user?.name}</span>
                             <span className="user-role" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{session.user?.role}</span>
                         </div>
+                        {session.user?.role === 'admin' && pathname !== '/admin' && (
+                            <Link href="/admin" 
+                                style={{ 
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    padding: '0.5rem 0.8rem', fontSize: '0.85rem', 
+                                    textDecoration: 'none', backgroundColor: '#f1f5f9', 
+                                    color: '#1e293b', borderRadius: '0.5rem', fontWeight: 500,
+                                    transition: 'background-color 0.2s', marginRight: '0.5rem'
+                                }}>
+                                <LayoutDashboard size={16} />
+                                <span className="hidden sm:inline">Admin Panel</span>
+                            </Link>
+                        )}
                         {(session.user?.role === 'teacher' || session.user?.role === 'admin') && pathname !== '/teacher' && (
                             <Link href="/teacher" 
                                 style={{ 

@@ -215,6 +215,12 @@ h6 {
   text-transform: uppercase;
   font-size: 0.8rem;
   cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.data-table th:hover {
+  background-color: #e2e8f0;
+  color: var(--color-text);
 }
 
 .data-table tr:nth-child(even) {

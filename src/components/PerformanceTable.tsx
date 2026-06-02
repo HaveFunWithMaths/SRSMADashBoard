@@ -91,7 +91,7 @@ export default function PerformanceTable({
 
     const startEditing = (row: StudentPerformanceRecord) => {
         setEditingKey(getRowKey(row));
-        setDraftMarks(row.marks === null ? '' : String(row.marks));
+        setDraftMarks(row.marks === -1 ? 'NA' : row.marks === null ? '' : String(row.marks));
         setDraftComments(row.comments ?? '');
     };
 
@@ -107,12 +107,12 @@ export default function PerformanceTable({
             return;
         }
 
-        const trimmedMarks = draftMarks.trim();
-        const parsedMarks = trimmedMarks === '' ? null : Number(trimmedMarks);
+        const trimmedMarks = draftMarks.trim().toUpperCase();
+        const parsedMarks = trimmedMarks === '' ? null : (trimmedMarks === 'NA' ? -1 : Number(draftMarks.trim()));
 
-        if (trimmedMarks !== '') {
+        if (trimmedMarks !== '' && trimmedMarks !== 'NA') {
             if (parsedMarks === null || Number.isNaN(parsedMarks) || parsedMarks < 0) {
-                alert('Enter a valid marks value or leave it blank for absent.');
+                alert('Enter a valid marks value, NA, or leave it blank for absent.');
                 return;
             }
 
@@ -223,9 +223,7 @@ export default function PerformanceTable({
                                         {isEditing ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                                 <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    min="0"
+                                                    type="text"
                                                     value={draftMarks}
                                                     onChange={(event) => setDraftMarks(event.target.value)}
                                                     disabled={isSaving}

@@ -583,9 +583,17 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             }
         }
 
-        // Last login per user
+        // Last login per user with frequency
         const lastLogins = await sql`
-            SELECT DISTINCT ON (username) username, name, role, device_type, browser, os, login_time
+            SELECT DISTINCT ON (username) 
+                username, 
+                name, 
+                role, 
+                device_type, 
+                browser, 
+                os, 
+                login_time,
+                COUNT(*) OVER (PARTITION BY username) as login_count
             FROM user_login_logs
             WHERE LOWER(role) = 'student'
               AND (
@@ -684,6 +692,37 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
         }
         throw e;
     }
+}
+
+export async function getUserLoginLogs(
+    username: string,
+    fromDate?: string,
+    toDate?: string,
+    activePeriodDays?: number
+): Promise<any[]> {
+    const sql = getSQL();
+    const useRange = !!(fromDate && toDate);
+    const useDays = !!(!useRange && activePeriodDays);
+    let days = 0;
+    if (activePeriodDays !== undefined && activePeriodDays !== null) {
+        days = parseInt(String(activePeriodDays), 10);
+        if (isNaN(days) || days < 0) {
+            days = 0;
+        }
+    }
+
+    const rows = await sql`
+        SELECT id, username, name, role, user_agent, device_type, browser, os, login_time
+        FROM user_login_logs
+        WHERE username = ${username}
+          AND (
+            (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
+            (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
+            (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+          )
+        ORDER BY login_time DESC
+    `;
+    return rows;
 }
 
 // ---------- Feedback ----------

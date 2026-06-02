@@ -6,7 +6,7 @@ import { StudentRecord, TopicData } from './types';
  * Rounds to 1 decimal place.
  */
 export function calculatePercentage(marks: number | null, totalMarks: number): number | null {
-    if (marks === null || totalMarks === 0) return null;
+    if (marks === null || marks === -1 || totalMarks === 0) return null;
     const percentage = (marks / totalMarks) * 100;
     return Math.round(percentage * 10) / 10;
 }
@@ -14,12 +14,12 @@ export function calculatePercentage(marks: number | null, totalMarks: number): n
 /**
  * Calculates ranks for a list of students based on marks.
  * Uses standard competition ranking (1224) for ties.
- * Absent students (marks=null) get rank=null.
+ * Absent students (marks=null) or NA students (marks=-1) get rank=null.
  * Returns a new array of students with rank populated.
  */
 export function calculateRanks(students: StudentRecord[]): StudentRecord[] {
-    // Filter out students with null marks for ranking
-    const validStudents = students.filter(s => s.marks !== null);
+    // Filter out students with null or -1 marks for ranking
+    const validStudents = students.filter(s => s.marks !== null && s.marks !== -1);
 
     // Sort by marks descending
     validStudents.sort((a, b) => (b.marks as number) - (a.marks as number));
@@ -43,7 +43,7 @@ export function calculateRanks(students: StudentRecord[]): StudentRecord[] {
 
     // Apply ranks to original list
     return rankedStudents.map(s => {
-        if (s.marks === null) {
+        if (s.marks === null || s.marks === -1) {
             return { ...s, rank: null };
         }
         const key = s.rollNo || s.name;
@@ -53,12 +53,12 @@ export function calculateRanks(students: StudentRecord[]): StudentRecord[] {
 
 /**
  * Calculates class average marks.
- * Excludes absent students.
+ * Excludes absent and NA students.
  */
 export function calculateClassAverage(students: StudentRecord[]): number {
     const validMarks = students
         .map(s => s.marks)
-        .filter((m): m is number => m !== null);
+        .filter((m): m is number => m !== null && m !== -1);
 
     if (validMarks.length === 0) return 0;
 
@@ -69,11 +69,12 @@ export function calculateClassAverage(students: StudentRecord[]): number {
 
 /**
  * Gets the highest marks in the topic.
+ * Excludes absent and NA students.
  */
 export function getTopperMarks(students: StudentRecord[]): number {
     const validMarks = students
         .map(s => s.marks)
-        .filter((m): m is number => m !== null);
+        .filter((m): m is number => m !== null && m !== -1);
 
     if (validMarks.length === 0) return 0;
     return Math.max(...validMarks);
@@ -81,11 +82,12 @@ export function getTopperMarks(students: StudentRecord[]): number {
 
 /**
  * Calculates standard deviation for a list of valid marks.
+ * Excludes absent and NA students.
  */
 export function calculateStandardDeviation(students: StudentRecord[], mean: number): number {
     const validMarks = students
         .map(s => s.marks)
-        .filter((m): m is number => m !== null);
+        .filter((m): m is number => m !== null && m !== -1);
 
     if (validMarks.length === 0) return 0;
     

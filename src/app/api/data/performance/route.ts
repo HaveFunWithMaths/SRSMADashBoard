@@ -31,8 +31,10 @@ export async function PATCH(request: Request) {
             for (const update of updates) {
                 const { studentName, marks, comments } = update;
                 if (!studentName) continue;
-                const marksValue =
-                    marks === null || marks === undefined || marks === '' || Number.isNaN(Number(marks))
+                const rawMarks = typeof marks === 'string' ? marks.trim().toUpperCase() : String(marks ?? '').trim().toUpperCase();
+                const marksValue = (rawMarks === 'NA' || rawMarks === '-1' || marks === -1)
+                    ? -1
+                    : (marks === null || marks === undefined || marks === '' || Number.isNaN(Number(marks)))
                         ? null
                         : Number(marks);
                 const commentsValue =
@@ -49,7 +51,7 @@ export async function PATCH(request: Request) {
                     commentsValue
                 );
 
-                if (marksValue !== null) {
+                if (marksValue !== null && marksValue !== -1) {
                     const rollNo = await getStudentRollNo(String(studentName), String(className));
                     if (rollNo) {
                         await addNotification(rollNo, `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
@@ -79,8 +81,10 @@ export async function PATCH(request: Request) {
             }
         }
 
-        const marksValue =
-            marks === null || marks === undefined || marks === '' || Number.isNaN(Number(marks))
+        const rawMarks = typeof marks === 'string' ? marks.trim().toUpperCase() : String(marks ?? '').trim().toUpperCase();
+        const marksValue = (rawMarks === 'NA' || rawMarks === '-1' || marks === -1)
+            ? -1
+            : (marks === null || marks === undefined || marks === '' || Number.isNaN(Number(marks)))
                 ? null
                 : Number(marks);
         const commentsValue =
@@ -101,7 +105,7 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Performance record not found' }, { status: 404 });
         }
 
-        if (marksValue !== null) {
+        if (marksValue !== null && marksValue !== -1) {
             const rollNo = await getStudentRollNo(String(studentName), String(className));
             if (rollNo) {
                 await addNotification(rollNo, `Your marks for ${subject} - ${topicName} have been updated to ${marksValue}.`);
