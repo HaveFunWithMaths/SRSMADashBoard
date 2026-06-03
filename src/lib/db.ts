@@ -79,7 +79,7 @@ export async function initializeDatabase(): Promise<void> {
             device_type VARCHAR(50),
             browser VARCHAR(100),
             os VARCHAR(100),
-            login_time TIMESTAMP DEFAULT NOW()
+            login_time TIMESTAMP DEFAULT (timezone('Asia/Kolkata', NOW()))
         )
     `;
 
@@ -112,6 +112,32 @@ export async function initializeDatabase(): Promise<void> {
         SET subject = 'Combined'
         WHERE subject = 'Total'
     `;
+
+    // Alter default value and migrate existing data for user_login_logs if not already done
+    try {
+        const defaultCheck = await sql`
+            SELECT column_default 
+            FROM information_schema.columns 
+            WHERE table_name = 'user_login_logs' AND column_name = 'login_time'
+        `;
+        if (defaultCheck.length > 0) {
+            const currentDefault = String(defaultCheck[0].column_default || '').toLowerCase();
+            if (currentDefault === 'now()' || !currentDefault.includes('timezone')) {
+                // Convert existing UTC timestamps to IST
+                await sql`
+                    UPDATE user_login_logs 
+                    SET login_time = login_time + INTERVAL '5 hours 30 minutes'
+                `;
+                // Alter default to use IST timezone-converted now()
+                await sql`
+                    ALTER TABLE user_login_logs 
+                    ALTER COLUMN login_time SET DEFAULT (timezone('Asia/Kolkata', NOW()))
+                `;
+            }
+        }
+    } catch (e) {
+        console.error('Error migrating user_login_logs default time:', e);
+    }
 }
 // ---------- Performance Queries ----------
 
@@ -592,14 +618,14 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
                 device_type, 
                 browser, 
                 os, 
-                login_time,
+                (login_time AT TIME ZONE 'Asia/Kolkata') as login_time,
                 COUNT(*) OVER (PARTITION BY username) as login_count
             FROM user_login_logs
             WHERE LOWER(role) = 'student'
               AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
               )
             ORDER BY username, login_time DESC
         `;
@@ -607,7 +633,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
         // Total logins today
         const todayLogins = await sql`
             SELECT COUNT(*) as count FROM user_login_logs
-            WHERE login_time >= NOW() - INTERVAL '1 day'
+            WHERE login_time >= timezone('Asia/Kolkata', NOW()) - INTERVAL '1 day'
         `;
 
         // Active users in selected period
@@ -616,7 +642,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
             )
         `;
 
@@ -627,7 +653,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
             )
             GROUP BY device_type
             ORDER BY count DESC
@@ -640,7 +666,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
             )
             GROUP BY browser
             ORDER BY count DESC
@@ -653,7 +679,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             WHERE (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
             )
             GROUP BY os
             ORDER BY count DESC
@@ -664,9 +690,9 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             SELECT DATE(login_time) as date, COUNT(*) as count
             FROM user_login_logs
             WHERE (
-                (${useRange}::boolean = false AND ${useDays}::boolean = false AND login_time >= NOW() - INTERVAL '30 days') OR
+                (${useRange}::boolean = false AND ${useDays}::boolean = false AND login_time >= timezone('Asia/Kolkata', NOW()) - INTERVAL '30 days') OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-                (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+                (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
             )
             GROUP BY DATE(login_time)
             ORDER BY date ASC
@@ -712,13 +738,13 @@ export async function getUserLoginLogs(
     }
 
     const rows = await sql`
-        SELECT id, username, name, role, user_agent, device_type, browser, os, login_time
+        SELECT id, username, name, role, user_agent, device_type, browser, os, (login_time AT TIME ZONE 'Asia/Kolkata') as login_time
         FROM user_login_logs
         WHERE username = ${username}
           AND (
             (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
             (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
-            (${useDays}::boolean = true AND login_time >= NOW() - (${days} || ' days')::INTERVAL)
+            (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
           )
         ORDER BY login_time DESC
     `;

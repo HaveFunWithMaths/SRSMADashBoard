@@ -358,7 +358,7 @@ export default function AdminDashboard() {
                                         <div style={{ height: 220 }}>
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <LineChart
-                                                    data={analyticsStats.loginTrend.map((d: any) => ({ date: new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), Logins: Number(d.count) }))}
+                                                    data={analyticsStats.loginTrend.map((d: any) => ({ date: new Date(d.date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }), Logins: Number(d.count) }))}
                                                     margin={{ top: 10, right: 20, left: 0, bottom: 30 }}
                                                 >
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -527,7 +527,7 @@ export default function AdminDashboard() {
                                                             <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>{u.browser || '—'}</td>
                                                             <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>{u.os || '—'}</td>
                                                             <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#94a3b8', fontSize: '0.82rem' }}>
-                                                                {new Date(u.login_time).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                                {new Date(u.login_time).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -634,7 +634,7 @@ export default function AdminDashboard() {
                                         {studentLoginsDetail.map((log: any, idx: number) => (
                                             <tr key={log.id || idx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc', fontSize: '0.85rem' }}>
                                                 <td style={{ padding: '0.65rem 0.85rem', color: '#334155', fontWeight: 500 }}>
-                                                    {new Date(log.login_time).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                    {new Date(log.login_time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                                 </td>
                                                 <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', color: '#475569' }}>
                                                     {log.device_type === 'Mobile' ? '📱 Mobile' : log.device_type === 'Tablet' ? '📟 Tablet' : '🖥️ Desktop'}

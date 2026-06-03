@@ -76,8 +76,8 @@ export default function TeacherDashboard() {
 
     // Teacher check
     const isRegularTeacher = session?.user?.role !== 'admin' &&
-                            session?.user?.name?.toLowerCase() !== 'srsma' &&
-                            session?.user?.username?.toLowerCase() !== 'srsma';
+        session?.user?.name?.toLowerCase() !== 'srsma' &&
+        session?.user?.username?.toLowerCase() !== 'srsma';
 
     // Teacher Mappings & Accounts Admin state
     const [teachersList, setTeachersList] = useState<any[]>([]);
@@ -655,7 +655,7 @@ export default function TeacherDashboard() {
 
         return teacherPermissions.some(
             (p: any) => p.class_name.toLowerCase() === selectedClass.toLowerCase() &&
-                       p.subject.toLowerCase() === selectedSubject.toLowerCase()
+                p.subject.toLowerCase() === selectedSubject.toLowerCase()
         );
     }, [isRegularTeacher, selectedClass, selectedSubject, teacherPermissions]);
 
@@ -878,8 +878,8 @@ export default function TeacherDashboard() {
         try {
             const updates = Object.entries(bulkDraft).map(([studentName, draft]) => {
                 const m = draft.marks.trim().toUpperCase();
-                const marksValue = (m === '' || m === 'AB') 
-                    ? null 
+                const marksValue = (m === '' || m === 'AB')
+                    ? null
                     : (m === 'NA' ? -1 : Number(draft.marks.trim()));
                 return {
                     studentName,
@@ -2374,7 +2374,7 @@ export default function TeacherDashboard() {
                                                                     + Add
                                                                 </button>
                                                             </div>
-                                                            
+
                                                             {selectedTeacherClasses[teacher.name] && (
                                                                 <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                                                                     {getDynamicSubjectsForClass(selectedTeacherClasses[teacher.name]).map(s => {
@@ -2425,7 +2425,7 @@ export default function TeacherDashboard() {
                         {/* Section 2: Teacher Data */}
                         <div>
                             <h3 className="card-title" style={{ marginBottom: '1.25rem' }}>Teacher Accounts</h3>
-                            
+
                             <form onSubmit={handleAddNewTeacher} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem', padding: '1.25rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Add New Teacher Name</label>
@@ -2439,7 +2439,7 @@ export default function TeacherDashboard() {
                                     />
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Temporary Password</label>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Password</label>
                                     <input
                                         type="text"
                                         value={newTeacherPassword}
