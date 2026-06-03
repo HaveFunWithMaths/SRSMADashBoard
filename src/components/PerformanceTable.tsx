@@ -4,23 +4,6 @@ import { useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { StudentPerformanceRecord } from '@/lib/types';
 
-const FlashyIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px', flexShrink: 0 }}>
-        <style>{`
-            @keyframes pulse-glow {
-                0% { transform: scale(0.8); filter: drop-shadow(0 0 2px #eab308); opacity: 0.5; }
-                50% { transform: scale(1.3); filter: drop-shadow(0 0 8px #eab308) drop-shadow(0 0 15px #eab308); opacity: 1; }
-                100% { transform: scale(0.8); filter: drop-shadow(0 0 2px #eab308); opacity: 0.5; }
-            }
-            .glow-star {
-                transform-origin: center;
-                animation: pulse-glow 0.8s ease-in-out infinite;
-                fill: #eab308;
-            }
-        `}</style>
-        <path className="glow-star" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-    </svg>
-);
 
 function FlashHandler({ onFlash }: { onFlash: (topic: string) => void }) {
     const searchParams = useSearchParams();
@@ -56,7 +39,7 @@ export default function PerformanceTable({
     const [savingKey, setSavingKey] = useState<string | null>(null);
 
     // Sorting state
-    const [sortField, setSortField] = useState<string>('percentage');
+    const [sortField, setSortField] = useState<string>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     // Bulk Edit state
@@ -65,6 +48,48 @@ export default function PerformanceTable({
     const [isSavingBulk, setIsSavingBulk] = useState(false);
 
     const getRowKey = (row: StudentPerformanceRecord) => `${row.className ?? ''}::${row.subject ?? ''}::${row.topic ?? ''}::${row.date ?? ''}`;
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: 'marks' | 'comments', index: number) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextInput = document.getElementById(`bulk-${field}-${index + 1}`);
+            if (nextInput) {
+                (nextInput as HTMLInputElement).focus();
+                (nextInput as HTMLInputElement).select();
+            }
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                if (field === 'comments') {
+                    const prevInput = document.getElementById(`bulk-marks-${index}`);
+                    if (prevInput) {
+                        (prevInput as HTMLInputElement).focus();
+                        (prevInput as HTMLInputElement).select();
+                    }
+                } else {
+                    const prevInput = document.getElementById(`bulk-comments-${index - 1}`);
+                    if (prevInput) {
+                        (prevInput as HTMLInputElement).focus();
+                        (prevInput as HTMLInputElement).select();
+                    }
+                }
+            } else {
+                if (field === 'marks') {
+                    const nextInput = document.getElementById(`bulk-comments-${index}`);
+                    if (nextInput) {
+                        (nextInput as HTMLInputElement).focus();
+                        (nextInput as HTMLInputElement).select();
+                    }
+                } else {
+                    const nextInput = document.getElementById(`bulk-marks-${index + 1}`);
+                    if (nextInput) {
+                        (nextInput as HTMLInputElement).focus();
+                        (nextInput as HTMLInputElement).select();
+                    }
+                }
+            }
+        }
+    };
 
     const sortedData = useMemo(() => {
         return [...data].sort((a, b) => {
@@ -434,8 +459,8 @@ export default function PerformanceTable({
                                 <tr 
                                     key={rowKey || idx}
                                     id={`row-${row.topic}`}
-                                    className={flashingTopic === row.topic ? 'flash-highlight' : ''}
                                     style={{
+                                        backgroundColor: flashingTopic === row.topic ? '#fef08a' : undefined,
                                         transition: 'background-color 1s ease'
                                     }}
                                 >
@@ -460,7 +485,6 @@ export default function PerformanceTable({
                                         onMouseOver={e => { if (onTopicClick) e.currentTarget.style.color = '#d4942a'; }}
                                         onMouseOut={e => { if (onTopicClick) e.currentTarget.style.color = '#1a365d'; }}
                                     >
-                                        {flashingTopic === row.topic && <FlashyIcon />}
                                         {row.topic}
                                         {onTopicClick && (
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, marginTop: '2px' }}>
@@ -472,6 +496,8 @@ export default function PerformanceTable({
                                         {isEditing || isBulkEditing ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                                 <input
+                                                    id={isBulkEditing ? `bulk-marks-${idx}` : undefined}
+                                                    onKeyDown={isBulkEditing ? (e) => handleKeyDown(e, 'marks', idx) : undefined}
                                                     type="text"
                                                     value={isBulkEditing ? (bulkDraft[rowKey]?.marks ?? '') : draftMarks}
                                                     onChange={(event) => {
@@ -511,6 +537,8 @@ export default function PerformanceTable({
                                     <td style={{ maxWidth: '250px', color: '#64748b', fontSize: '0.85rem' }}>
                                         {isEditing || isBulkEditing ? (
                                             <input
+                                                id={isBulkEditing ? `bulk-comments-${idx}` : undefined}
+                                                onKeyDown={isBulkEditing ? (e) => handleKeyDown(e, 'comments', idx) : undefined}
                                                 type="text"
                                                 value={isBulkEditing ? (bulkDraft[rowKey]?.comments ?? '') : draftComments}
                                                 onChange={(event) => {

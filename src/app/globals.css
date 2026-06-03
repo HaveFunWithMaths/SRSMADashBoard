@@ -355,20 +355,4 @@ h6 {
 
 .back-button:hover svg {
   transform: translateX(-2px);
-}
-
-@keyframes row-flash-animation {
-  0% {
-    background-color: rgba(254, 240, 138, 1) !important;
-  }
-  50% {
-    background-color: rgba(254, 240, 138, 0.4) !important;
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-.flash-highlight {
-  animation: row-flash-animation 3s ease-out;
 }

@@ -49,6 +49,19 @@ export default function Header() {
         return null;
     };
 
+    const handleMarkAllAsRead = async () => {
+        try {
+            setNotifications([]);
+            await fetch('/api/student/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        } catch (err) {
+            console.error('Error marking all as read:', err);
+        }
+    };
+
     return (
         <header className="dashboard-header" style={{ borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
             <div className="container header-content">
@@ -94,8 +107,32 @@ export default function Header() {
                                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '300px', zIndex: 100,
                                         maxHeight: '400px', overflowY: 'auto'
                                     }}>
-                                        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', fontWeight: 600, color: '#1e293b' }}>
-                                            Notifications
+                                        <div style={{ 
+                                            padding: '0.75rem 1rem', 
+                                            borderBottom: '1px solid #f1f5f9', 
+                                            fontWeight: 600, 
+                                            color: '#1e293b',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <span>Notifications</span>
+                                            {notifications.length > 0 && (
+                                                <button
+                                                    onClick={handleMarkAllAsRead}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: '#7c3aed',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        padding: 0
+                                                    }}
+                                                >
+                                                    Mark all as read
+                                                </button>
+                                            )}
                                         </div>
                                         {notifications.length > 0 ? (
                                             notifications.map(n => (
