@@ -19,7 +19,18 @@ export default function PerformanceChart({ data, subject }: PerformanceChartProp
     return (
         <FullScreenChart height={350}>
             <ResponsiveContainer>
-                <ComposedChart data={data} margin={{ top: 15, right: 30, left: 20, bottom: 40 }}>
+                <ComposedChart
+                    data={data}
+                    margin={{ top: 15, right: 30, left: 20, bottom: 40 }}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(state) => {
+                        if (state && state.activeLabel) {
+                            const topic = state.activeLabel;
+                            const event = new CustomEvent('scrollToRow', { detail: { topic } });
+                            window.dispatchEvent(event);
+                        }
+                    }}
+                >
                     <defs>
                         <linearGradient id={`colorScore_${subject}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={subjectColor} stopOpacity={0.25} />

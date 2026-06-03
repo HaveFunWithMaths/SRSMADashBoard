@@ -1572,6 +1572,7 @@ export default function TeacherDashboard() {
                                     externalActiveSubject={selectedSubject}
                                     onSubjectChange={setSelectedSubject}
                                     onPerformanceUpdated={refreshBatchData}
+                                    editable={session?.user?.role === 'teacher' || session?.user?.role === 'admin'}
                                     onTopicClick={(topic, subject) => {
                                         if (subject && subjects.includes(subject)) {
                                             setSelectedSubject(subject);

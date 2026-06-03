@@ -26,7 +26,18 @@ export default function RankTrendChart({ data, subject }: RankTrendChartProps) {
     return (
         <FullScreenChart height={350}>
             <ResponsiveContainer>
-                <LineChart data={chartData} margin={{ top: 15, right: 30, left: 20, bottom: 40 }}>
+                <LineChart
+                    data={chartData}
+                    margin={{ top: 15, right: 30, left: 20, bottom: 40 }}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(state) => {
+                        if (state && state.activeLabel) {
+                            const topic = state.activeLabel;
+                            const event = new CustomEvent('scrollToRow', { detail: { topic } });
+                            window.dispatchEvent(event);
+                        }
+                    }}
+                >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
                         dataKey="topic"
