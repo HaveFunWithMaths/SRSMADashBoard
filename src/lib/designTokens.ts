@@ -15,6 +15,8 @@ export const COLORS = {
     Maths: '#ef4444',     // Red
     Physics: '#3b82f6',   // Blue
     Chemistry: '#f59e0b', // Golden
+    Biology: '#10b981',   // Green
+    Combined: '#8b5cf6',  // Violet
     Total: '#8b5cf6',     // Violet
     default: '#64748b'    // Slate
   }

@@ -10,6 +10,9 @@ import PerformanceTable from '@/components/PerformanceTable';
 import type { StudentPerformanceRecord } from '@/lib/types';
 import { toast } from 'react-hot-toast';
 import { Suspense } from 'react';
+import { COLORS } from '@/lib/designTokens';
+
+const SUBJECT_COLORS = COLORS.subjects;
 
 function DashboardContent() {
     const { data: session, status } = useSession();
@@ -21,6 +24,8 @@ function DashboardContent() {
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<string[]>([]);
     const [activeSubject, setActiveSubject] = useState<string>('');
+
+    const subjectColor = SUBJECT_COLORS[activeSubject as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS['default'];
 
     // Feedback modal state
     const [showFeedback, setShowFeedback] = useState(false);
@@ -170,7 +175,7 @@ function DashboardContent() {
 
                 <div className="flex justify-between items-center mb-4" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                        <h2 className="text-xl font-bold text-primary">Student Performance</h2>
+                        <h2 className="text-xl font-bold" style={{ color: subjectColor }}>Student Performance</h2>
                         <p className="text-sm text-muted">Viewing data for: {displayedStudentName}</p>
                     </div>
                     <div className="tabs" style={{ marginBottom: 0 }}>
@@ -192,17 +197,17 @@ function DashboardContent() {
                     <>
                         <div className="dashboard-grid">
                             <div className="card">
-                                <h3 className="card-title">Performance Trend</h3>
+                                <h3 className="card-title" style={{ color: subjectColor }}>Performance Trend</h3>
                                 <PerformanceChart data={subjectData} subject={activeSubject} />
                             </div>
                             <div className="card">
-                                <h3 className="card-title">Rank Consistency</h3>
-                                <RankTrendChart data={subjectData} />
+                                <h3 className="card-title" style={{ color: subjectColor }}>Rank Consistency</h3>
+                                <RankTrendChart data={subjectData} subject={activeSubject} />
                             </div>
                         </div>
 
                         <div className="card">
-                            <h3 className="card-title text-lg mb-4">Detailed Report</h3>
+                            <h3 className="card-title text-lg mb-4" style={{ color: subjectColor }}>Detailed Report</h3>
                             <PerformanceTable
                                 data={subjectData}
                                 editable={session.user.role === 'teacher' || session.user.role === 'admin'}

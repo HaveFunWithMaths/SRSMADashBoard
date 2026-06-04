@@ -22,6 +22,8 @@ export default function TeacherDashboard() {
     const [subjects, setSubjects] = useState<string[]>([]);
     const [selectedClass, setSelectedClass] = useState('');
     const [selectedSubject, setSelectedSubject] = useState('');
+
+    const subjectColor = SUBJECT_COLORS[selectedSubject as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS['default'];
     const [batchData, setBatchData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -1080,7 +1082,7 @@ export default function TeacherDashboard() {
                             {/* Student Performance Matrix */}
                             <div className="card" style={{ marginBottom: '1.5rem', overflow: 'hidden' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showPerformanceMatrix ? '1rem' : 0 }}>
-                                    <h3 className="card-title" style={{ margin: 0 }}>Student Performance Overview</h3>
+                                    <h3 className="card-title" style={{ margin: 0, color: subjectColor }}>Student Performance Overview</h3>
                                     <button
                                         onClick={() => setShowPerformanceMatrix(!showPerformanceMatrix)}
                                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
@@ -1128,7 +1130,7 @@ export default function TeacherDashboard() {
                             {/* Batch Performance Trend - Table or Graph */}
                             <div className="card" style={{ marginBottom: '1.5rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <h3 className="card-title" style={{ margin: 0 }}>Batch Performance Trend</h3>
+                                    <h3 className="card-title" style={{ margin: 0, color: subjectColor }}>Batch Performance Trend</h3>
                                     <div style={{ display: 'flex', gap: '0.5rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '0.5rem' }}>
                                         <button
                                             onClick={() => setViewMode('table')}
@@ -1291,7 +1293,7 @@ export default function TeacherDashboard() {
                                             <>
                                                 <div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', margin: 0, fontFamily: 'Outfit, sans-serif' }}>
+                                                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: subjectColor, margin: 0, fontFamily: 'Outfit, sans-serif' }}>
                                                             {selectedTopic}
                                                         </h3>
                                                         {isSubjectEditable && (
@@ -1548,7 +1550,7 @@ export default function TeacherDashboard() {
 
                 {activeTab === 'students' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <h3 className="card-title" style={{ marginBottom: '1rem' }}>Student Dashboard</h3>
+                        <h3 className="card-title" style={{ marginBottom: '1rem', color: subjectColor }}>Student Dashboard</h3>
 
                         {/* Student Selector */}
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: selectedStudent ? '1.5rem' : 0 }}>
@@ -2058,7 +2060,7 @@ export default function TeacherDashboard() {
                             </div>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                            <h3 className="card-title" style={{ margin: 0 }}>Upload Marks: {selectedClass.replace(/_/g, ' ')} - {selectedSubject}</h3>
+                            <h3 className="card-title" style={{ margin: 0, color: subjectColor }}>Upload Marks: {selectedClass.replace(/_/g, ' ')} - {selectedSubject}</h3>
                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 {isSubjectEditable && (
                                     <>
