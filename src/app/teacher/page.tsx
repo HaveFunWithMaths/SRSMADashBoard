@@ -1312,6 +1312,7 @@ export default function TeacherDashboard() {
                                                         <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Total Marks</span>
                                                         <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{topicDetails.totalMarks}</span>
                                                     </div>
+                                                    {isSubjectEditable && (
                                                     <button
                                                         onClick={() => {
                                                             setCustomHighCutoff(highCutoff !== null ? Number(highCutoff.toFixed(2)) : null);
@@ -1329,6 +1330,7 @@ export default function TeacherDashboard() {
                                                     >
                                                         {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
                                                     </button>
+                                                    )}
                                                     {isSubjectEditable && (
                                                         isBulkEditing ? (
                                                             <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.5rem' }}>
@@ -2073,6 +2075,7 @@ export default function TeacherDashboard() {
                                         </label>
                                     </>
                                 )}
+                                {isSubjectEditable && (
                                 <button
                                     onClick={() => {
                                         setCustomHighCutoff(uploadHighCutoff !== null ? Number(uploadHighCutoff.toFixed(2)) : null);
@@ -2102,6 +2105,7 @@ export default function TeacherDashboard() {
                                 >
                                     {showCutoffModal ? 'Hide Cutoffs' : 'Set Cutoffs'}
                                 </button>
+                                )}
                             </div>
                         </div>
 

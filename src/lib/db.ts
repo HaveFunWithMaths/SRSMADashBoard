@@ -609,7 +609,7 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             }
         }
 
-        // Last login per user with frequency
+        // Last login per user with frequency (exclude teachers and Class_Test)
         const lastLogins = await sql`
             SELECT DISTINCT ON (username) 
                 username, 
@@ -622,6 +622,9 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
                 COUNT(*) OVER (PARTITION BY username) as login_count
             FROM user_login_logs
             WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
               AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
@@ -630,84 +633,109 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             ORDER BY username, login_time DESC
         `;
 
-        // Total logins today
+        // Total logins today (students only, excluding Class_Test and teachers)
         const todayLogins = await sql`
             SELECT COUNT(*) as count FROM user_login_logs
-            WHERE login_time >= timezone('Asia/Kolkata', NOW()) - INTERVAL '1 day'
+            WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
+              AND login_time >= timezone('Asia/Kolkata', NOW()) - INTERVAL '1 day'
         `;
 
-        // Active users in selected period
+        // Active users in selected period (students only, excluding Class_Test and teachers)
         const periodSql = await sql`
             SELECT COUNT(DISTINCT username) as count FROM user_login_logs
-            WHERE (
+            WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
+              AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
                 (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
-            )
+              )
         `;
 
-        // Device breakdown
+        // Device breakdown (students only, excluding Class_Test and teachers)
         const deviceBreakdown = await sql`
             SELECT device_type, COUNT(*) as count
             FROM user_login_logs
-            WHERE (
+            WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
+              AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
                 (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
-            )
+              )
             GROUP BY device_type
             ORDER BY count DESC
         `;
 
-        // Browser breakdown
+        // Browser breakdown (students only, excluding Class_Test and teachers)
         const browserBreakdown = await sql`
             SELECT browser, COUNT(*) as count
             FROM user_login_logs
-            WHERE (
+            WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
+              AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
                 (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
-            )
+              )
             GROUP BY browser
             ORDER BY count DESC
         `;
 
-        // OS breakdown
+        // OS breakdown (students only, excluding Class_Test and teachers)
         const osBreakdown = await sql`
             SELECT os, COUNT(*) as count
             FROM user_login_logs
-            WHERE (
+            WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
+              AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false) OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
                 (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
-            )
+              )
             GROUP BY os
             ORDER BY count DESC
         `;
 
-        // Login trend
+        // Login trend (students only, excluding Class_Test and teachers)
         const loginTrend = await sql`
             SELECT DATE(login_time) as date, COUNT(*) as count
             FROM user_login_logs
-            WHERE (
+            WHERE LOWER(role) = 'student'
+              AND username NOT IN (
+                SELECT username FROM users WHERE LOWER(class) = 'test' AND username IS NOT NULL
+              )
+              AND (
                 (${useRange}::boolean = false AND ${useDays}::boolean = false AND login_time >= timezone('Asia/Kolkata', NOW()) - INTERVAL '30 days') OR
                 (${useRange}::boolean = true AND login_time >= ${fromDate || null}::TIMESTAMP AND login_time < ${toDate || null}::TIMESTAMP + INTERVAL '1 day') OR
                 (${useDays}::boolean = true AND login_time >= timezone('Asia/Kolkata', NOW()) - (${days} || ' days')::INTERVAL)
-            )
+              )
             GROUP BY DATE(login_time)
             ORDER BY date ASC
         `;
 
-        // Total users
-        const totalUsers = await sql`SELECT COUNT(*) as count FROM users WHERE status != 'Deleted'`;
+        // Total users (students only, excluding Class_Test)
+        const totalUsers = await sql`SELECT COUNT(*) as count FROM users WHERE status != 'Deleted' AND LOWER(role) = 'student' AND LOWER(class) != 'test'`;
 
-        // Students who have never logged in
+        // Students who have never logged in (excluding Class_Test)
         const neverLoggedIn = await sql`
             SELECT u.username, u.name, u.class
             FROM users u
             LEFT JOIN user_login_logs l ON l.username = u.username
             WHERE LOWER(u.role) = 'student'
               AND u.status != 'Deleted'
+              AND LOWER(u.class) != 'test'
               AND l.id IS NULL
             ORDER BY u.class, u.name
         `;
