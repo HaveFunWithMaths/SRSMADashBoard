@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import { useRouter } from 'next/navigation';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
 import { toast } from 'react-hot-toast';
+import type { AnalyticsStats, FeedbackItem } from '@/lib/types';
 
 export default function AdminDashboard() {
     const { data: session, status } = useSession();
@@ -14,10 +15,11 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'system' | 'analytics'>('analytics');
 
     // User Analytics state
-    const [analyticsStats, setAnalyticsStats] = useState<any>(null);
+    const [analyticsStats, setAnalyticsStats] = useState<AnalyticsStats | null>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [activePeriod, setActivePeriod] = useState<number | undefined>(7);
-    const [feedbackList, setFeedbackList] = useState<any[]>([]);
+    const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
+    const [neverLoggedInOpen, setNeverLoggedInOpen] = useState(false);
     const [replyingToId, setReplyingToId] = useState<number | null>(null);
     const [replyDraft, setReplyDraft] = useState('');
     const [isSavingReply, setIsSavingReply] = useState(false);
@@ -319,10 +321,10 @@ export default function AdminDashboard() {
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                                     <div className="card">
                                         <h3 className="card-title" style={{ marginBottom: '1rem' }}>Device Breakdown</h3>
-                                        {analyticsStats?.deviceBreakdown?.length > 0 ? (
+                                        {(analyticsStats?.deviceBreakdown?.length ?? 0) > 0 ? (
                                             <div style={{ height: 200 }}>
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={analyticsStats.deviceBreakdown.map((d: any) => ({ name: d.device_type, Logins: Number(d.count) }))} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                                    <BarChart data={analyticsStats!.deviceBreakdown.map(d => ({ name: d.device_type, Logins: Number(d.count) }))} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                         <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
                                                         <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -335,10 +337,10 @@ export default function AdminDashboard() {
                                     </div>
                                     <div className="card">
                                         <h3 className="card-title" style={{ marginBottom: '1rem' }}>Browser Distribution</h3>
-                                        {analyticsStats?.browserBreakdown?.length > 0 ? (
+                                        {(analyticsStats?.browserBreakdown?.length ?? 0) > 0 ? (
                                             <div style={{ height: 200 }}>
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={analyticsStats.browserBreakdown.map((d: any) => ({ name: d.browser, Logins: Number(d.count) }))} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                                    <BarChart data={analyticsStats!.browserBreakdown.map(d => ({ name: d.browser, Logins: Number(d.count) }))} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                         <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
                                                         <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -354,11 +356,11 @@ export default function AdminDashboard() {
                                 {/* Login Trend */}
                                 <div className="card" style={{ marginBottom: '1.5rem' }}>
                                     <h3 className="card-title" style={{ marginBottom: '1rem' }}>Login Trend (Last 30 Days)</h3>
-                                    {analyticsStats?.loginTrend?.length > 0 ? (
+                                    {(analyticsStats?.loginTrend?.length ?? 0) > 0 ? (
                                         <div style={{ height: 220 }}>
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <LineChart
-                                                    data={analyticsStats.loginTrend.map((d: any) => ({ date: new Date(d.date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }), Logins: Number(d.count) }))}
+                                                    data={analyticsStats!.loginTrend.map((d: any) => ({ date: new Date(d.date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }), Logins: Number(d.count) }))}
                                                     margin={{ top: 10, right: 20, left: 0, bottom: 30 }}
                                                 >
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -459,7 +461,7 @@ export default function AdminDashboard() {
                                 {/* Last Login Table */}
                                 <div className="card">
                                     <h3 className="card-title" style={{ marginBottom: '1rem' }}>Student Logins</h3>
-                                    {analyticsStats?.lastLogins?.length > 0 ? (
+                                    {(analyticsStats?.lastLogins?.length ?? 0) > 0 ? (
                                         <div style={{ overflowX: 'auto' }}>
                                             <table className="data-table" style={{ width: '100%' }}>
                                                 <thead>
@@ -539,6 +541,59 @@ export default function AdminDashboard() {
                                             No login records yet. Records appear after users log in.
                                         </div>
                                     )}
+
+                                    {/* ── NEVER LOGGED IN ── */}
+                                    <div className="card">
+                                        <div
+                                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                                            onClick={() => setNeverLoggedInOpen(o => !o)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <span style={{ fontSize: '1.1rem' }}>🔕</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="card-title" style={{ margin: 0, fontSize: '0.95rem' }}>Never Logged In</h3>
+                                                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+                                                        {analyticsStats?.neverLoggedIn?.length ?? 0} student{(analyticsStats?.neverLoggedIn?.length ?? 0) !== 1 ? 's' : ''} have not logged in yet
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span style={{ fontSize: '0.85rem', color: '#94a3b8', transition: 'transform 0.2s', transform: neverLoggedInOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+                                        </div>
+
+                                        {neverLoggedInOpen && (
+                                            <div style={{ marginTop: '1.25rem' }}>
+                                                {(analyticsStats?.neverLoggedIn?.length ?? 0) === 0 ? (
+                                                    <div style={{ textAlign: 'center', padding: '1.5rem', color: '#10b981', background: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #bbf7d0', fontSize: '0.88rem', fontWeight: 600 }}>
+                                                        ✅ All students have logged in at least once!
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ overflowX: 'auto' }}>
+                                                        <table className="data-table" style={{ width: '100%' }}>
+                                                            <thead>
+                                                                <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#fff7ed' }}>
+                                                                    <th style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>Name</th>
+                                                                    <th style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>Username / Roll</th>
+                                                                    <th style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>Class</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {analyticsStats!.neverLoggedIn!.map((s, idx) => (
+                                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#fffbf5' }}>
+                                                                        <td style={{ padding: '0.65rem 1rem', fontSize: '0.88rem', fontWeight: 600, color: '#1e293b' }}>{s.name}</td>
+                                                                        <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', color: '#64748b' }}>{s.username || '—'}</td>
+                                                                        <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', color: '#64748b' }}>{s.class || '—'}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                 </div>
                             </>
                         )}

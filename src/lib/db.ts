@@ -701,6 +701,17 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
         // Total users
         const totalUsers = await sql`SELECT COUNT(*) as count FROM users WHERE status != 'Deleted'`;
 
+        // Students who have never logged in
+        const neverLoggedIn = await sql`
+            SELECT u.username, u.name, u.class
+            FROM users u
+            LEFT JOIN user_login_logs l ON l.username = u.username
+            WHERE LOWER(u.role) = 'student'
+              AND u.status != 'Deleted'
+              AND l.id IS NULL
+            ORDER BY u.class, u.name
+        `;
+
         return {
             lastLogins,
             todayLogins: Number(todayLogins[0]?.count ?? 0),
@@ -710,11 +721,12 @@ export async function getLoginStats(activePeriodDays?: number, fromDate?: string
             osBreakdown,
             loginTrend,
             totalUsers: Number(totalUsers[0]?.count ?? 0),
+            neverLoggedIn,
         };
     } catch (e: any) {
         if (e.message?.includes('relation "user_login_logs" does not exist')) {
             await initializeDatabase();
-            return { lastLogins: [], todayLogins: 0, activeUsers: 0, deviceBreakdown: [], browserBreakdown: [], osBreakdown: [], loginTrend: [], totalUsers: 0 };
+            return { lastLogins: [], todayLogins: 0, activeUsers: 0, deviceBreakdown: [], browserBreakdown: [], osBreakdown: [], loginTrend: [], totalUsers: 0, neverLoggedIn: [] };
         }
         throw e;
     }

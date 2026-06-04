@@ -11,6 +11,7 @@ import type { StudentPerformanceRecord } from '@/lib/types';
 import { toast } from 'react-hot-toast';
 import { Suspense } from 'react';
 import { COLORS } from '@/lib/designTokens';
+import { sortSubjects } from '@/lib/subjectUtils';
 
 const SUBJECT_COLORS = COLORS.subjects;
 
@@ -61,37 +62,18 @@ function DashboardContent() {
             const safeData: StudentPerformanceRecord[] = Array.isArray(jsonData) ? jsonData : [];
             setData(safeData);
 
-            // Determine if the student is in Class 11 or 12
-            let is11Or12 = true;
-            if (safeData.length > 0 && safeData[0].className) {
-                is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(safeData[0].className);
-            } else if (session?.user?.class) {
-                const cleanedClass = String(session.user.class).replace(/^Class_/i, '');
-                is11Or12 = ['11', '12', '12+'].includes(cleanedClass);
-            }
-
             const dataSubjects = Array.from(new Set(safeData.map((item) => item.subject))) as string[];
-            const requiredSubjects = is11Or12
-                ? ['Maths', 'Physics', 'Chemistry', 'Combined']
-                : ['Maths', 'Physics', 'Chemistry', 'Biology'];
-            const uniqueSubjects = Array.from(new Set([...dataSubjects, ...requiredSubjects]));
-
-            const sortOrder = requiredSubjects;
-            const sortedSubjects = uniqueSubjects.sort((a, b) => {
-                const idxA = sortOrder.indexOf(a);
-                const idxB = sortOrder.indexOf(b);
-                if (idxA === -1 && idxB === -1) return a.localeCompare(b);
-                if (idxA === -1) return 1;
-                if (idxB === -1) return -1;
-                return idxA - idxB;
-            });
+            const className = (safeData.length > 0 && safeData[0].className)
+                ? safeData[0].className
+                : (session?.user?.class ? String(session.user.class) : 'Class_12+');
+            const sortedSubjects = sortSubjects(dataSubjects, className);
 
             setSubjects(sortedSubjects);
 
-            if (subjectParam && uniqueSubjects.includes(subjectParam)) {
+            if (subjectParam && sortedSubjects.includes(subjectParam)) {
                 setActiveSubject(subjectParam);
-            } else if (uniqueSubjects.length > 0) {
-                setActiveSubject(uniqueSubjects[0]);
+            } else if (sortedSubjects.length > 0) {
+                setActiveSubject(sortedSubjects[0]);
             }
         } catch (error) {
             console.error(error);
@@ -152,7 +134,29 @@ function DashboardContent() {
     };
 
     if (status === 'loading' || loading) {
-        return <div className="flex justify-center items-center h-screen">Loading...</div>;
+        return (
+            <>
+                <Header />
+                <main className="container">
+                    <div className="flex justify-between items-center mb-4" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                            <div className="skeleton" style={{ width: '200px', height: '28px', marginBottom: '0.5rem' }} />
+                            <div className="skeleton" style={{ width: '160px', height: '16px' }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ width: '80px', height: '36px', borderRadius: '0.5rem' }} />)}
+                        </div>
+                    </div>
+                    <div className="dashboard-grid">
+                        <div className="card"><div className="skeleton" style={{ height: '280px', borderRadius: '0.5rem' }} /></div>
+                        <div className="card"><div className="skeleton" style={{ height: '280px', borderRadius: '0.5rem' }} /></div>
+                    </div>
+                    <div className="card" style={{ marginTop: '1.5rem' }}>
+                        <div className="skeleton" style={{ height: '200px', borderRadius: '0.5rem' }} />
+                    </div>
+                </main>
+            </>
+        );
     }
 
     if (!session) return null;
@@ -179,20 +183,34 @@ function DashboardContent() {
                         <p className="text-sm text-muted">Viewing data for: {displayedStudentName}</p>
                     </div>
                     <div className="tabs" style={{ marginBottom: 0 }}>
-                        {subjects.map(sub => (
-                            <button
-                                key={sub}
-                                className={`tab-btn ${activeSubject === sub ? 'active' : ''}`}
-                                onClick={() => setActiveSubject(sub)}
-                            >
-                                {sub}
-                            </button>
-                        ))}
+                        {subjects.map(sub => {
+                            const color = SUBJECT_COLORS[sub as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS['default'];
+                            const isActive = activeSubject === sub;
+                            return (
+                                <button
+                                    key={sub}
+                                    className={`tab-btn ${isActive ? 'active' : ''}`}
+                                    onClick={() => setActiveSubject(sub)}
+                                    style={isActive ? {
+                                        backgroundColor: color,
+                                        borderColor: color,
+                                        color: '#fff',
+                                    } : undefined}
+                                >
+                                    {sub}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
+                <div key={activeSubject} className="subject-fade-in">
                 {subjectData.length === 0 ? (
-                    <div className="card text-center p-8">No data available for this subject.</div>
+                    <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem' }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
+                        <p style={{ fontWeight: 600, color: '#1e293b', marginBottom: '0.25rem' }}>No data yet for {activeSubject}</p>
+                        <p style={{ color: '#94a3b8', fontSize: '0.88rem' }}>Results will appear here once your teacher uploads marks for this subject.</p>
+                    </div>
                 ) : (
                     <>
                         <div className="dashboard-grid">
@@ -217,6 +235,7 @@ function DashboardContent() {
                         </div>
                     </>
                 )}
+                </div>
             </main>
 
             {/* ── Floating Feedback Button ── */}
@@ -369,7 +388,17 @@ function DashboardContent() {
 
 export default function Dashboard() {
     return (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={
+            <>
+                <Header />
+                <main className="container">
+                    <div className="dashboard-grid">
+                        <div className="card"><div className="skeleton" style={{ height: '280px', borderRadius: '0.5rem' }} /></div>
+                        <div className="card"><div className="skeleton" style={{ height: '280px', borderRadius: '0.5rem' }} /></div>
+                    </div>
+                </main>
+            </>
+        }>
             <DashboardContent />
         </Suspense>
     );

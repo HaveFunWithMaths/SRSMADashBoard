@@ -53,7 +53,9 @@ export default function LoginPage() {
                 .login-page {
                     min-height: 100vh;
                     min-height: 100dvh;
-                    background-color: #f0f2f5;
+                    background-color: #e8eef5;
+                    background-image: radial-gradient(ellipse at 20% 50%, rgba(26,54,93,0.07) 0%, transparent 60%),
+                                      radial-gradient(ellipse at 80% 20%, rgba(212,148,42,0.08) 0%, transparent 55%);
                     display: flex;
                     flex-direction: column;
                     align-items: center;
@@ -127,9 +129,9 @@ export default function LoginPage() {
                 }
 
                 .login-input:focus {
-                    border-color: #1877f2;
+                    border-color: #1a365d;
                     background: #fff;
-                    box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.12);
+                    box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.12);
                 }
 
                 /* ── Error ── */
@@ -157,7 +159,7 @@ export default function LoginPage() {
                 .login-btn {
                     width: 100%;
                     padding: 0.875rem;
-                    background: #1877f2;
+                    background: linear-gradient(135deg, #1a365d, #152c4e);
                     color: #fff;
                     border: none;
                     border-radius: 10px;
@@ -167,19 +169,19 @@ export default function LoginPage() {
                     cursor: pointer;
                     transition: background 0.18s, transform 0.12s, box-shadow 0.18s;
                     letter-spacing: 0.01em;
-                    box-shadow: 0 2px 8px rgba(24, 119, 242, 0.25);
+                    box-shadow: 0 2px 8px rgba(26, 54, 93, 0.3);
                     margin-top: 0.25rem;
                 }
 
                 .login-btn:hover:not(:disabled) {
-                    background: #166fe5;
-                    box-shadow: 0 4px 14px rgba(24, 119, 242, 0.35);
+                    background: linear-gradient(135deg, #152c4e, #0f1f38);
+                    box-shadow: 0 4px 14px rgba(26, 54, 93, 0.4);
                     transform: translateY(-1px);
                 }
 
                 .login-btn:active:not(:disabled) {
                     transform: translateY(0);
-                    box-shadow: 0 2px 6px rgba(24, 119, 242, 0.2);
+                    box-shadow: 0 2px 6px rgba(26, 54, 93, 0.25);
                 }
 
                 .login-btn:disabled {
@@ -240,7 +242,9 @@ export default function LoginPage() {
                 /* ── Desktop enhancement ── */
                 @media (min-width: 768px) {
                     .login-page {
-                        background: linear-gradient(135deg, #f0f2f5 0%, #dde6f0 100%);
+                        background-color: #dde6f0;
+                        background-image: radial-gradient(ellipse at 20% 50%, rgba(26,54,93,0.1) 0%, transparent 60%),
+                                          radial-gradient(ellipse at 80% 20%, rgba(212,148,42,0.1) 0%, transparent 55%);
                     }
 
                     .login-brand-logo {

@@ -11,6 +11,8 @@ import { COLORS } from '@/lib/designTokens';
 import { BookOpen, TrendingUp, Users, Edit2, Download, UploadCloud, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
 import * as xlsx from 'xlsx';
 import FullScreenChart from '@/components/FullScreenChart';
+import { sortSubjects } from '@/lib/subjectUtils';
+import type { TeacherUser, TeacherMapping, TeacherPermission, UploadStudent, BatchTopic, PivotStudentRow } from '@/lib/types';
 
 const SUBJECT_COLORS = COLORS.subjects;
 
@@ -24,11 +26,11 @@ export default function TeacherDashboard() {
     const [selectedSubject, setSelectedSubject] = useState('');
 
     const subjectColor = SUBJECT_COLORS[selectedSubject as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS['default'];
-    const [batchData, setBatchData] = useState<any[]>([]);
+    const [batchData, setBatchData] = useState<BatchTopic[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-    const [topicDetails, setTopicDetails] = useState<any>(null);
-    const [students, setStudents] = useState<any[]>([]);
+    const [topicDetails, setTopicDetails] = useState<BatchTopic | null>(null);
+    const [students, setStudents] = useState<TeacherUser[]>([]);
     const [selectedStudent, setSelectedStudent] = useState('');
     const [activeTab, setActiveTab] = useState<'analysis' | 'students' | 'manage' | 'upload' | 'analytics' | 'manage-teachers'>('analysis');
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
@@ -41,7 +43,7 @@ export default function TeacherDashboard() {
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
     const [uploadTopicName, setUploadTopicName] = useState('');
     const [uploadTotalMarks, setUploadTotalMarks] = useState('');
-    const [uploadStudents, setUploadStudents] = useState<any[]>([]);
+    const [uploadStudents, setUploadStudents] = useState<UploadStudent[]>([]);
     const [isUploading, setIsUploading] = useState(false);
 
     // Cutoff State
@@ -82,8 +84,8 @@ export default function TeacherDashboard() {
         session?.user?.username?.toLowerCase() !== 'srsma';
 
     // Teacher Mappings & Accounts Admin state
-    const [teachersList, setTeachersList] = useState<any[]>([]);
-    const [teacherMappings, setTeacherMappings] = useState<any[]>([]);
+    const [teachersList, setTeachersList] = useState<TeacherUser[]>([]);
+    const [teacherMappings, setTeacherMappings] = useState<TeacherMapping[]>([]);
     const [newTeacherName, setNewTeacherName] = useState('');
     const [newTeacherPassword, setNewTeacherPassword] = useState('');
     const [editingTeacherNameId, setEditingTeacherNameId] = useState<number | null>(null);
@@ -94,7 +96,7 @@ export default function TeacherDashboard() {
     const [selectedTeacherSubjects, setSelectedTeacherSubjects] = useState<Record<string, string>>({});
     const [selectedTeacherSubjectsMulti, setSelectedTeacherSubjectsMulti] = useState<Record<string, string[]>>({});
     const [mappingToDelete, setMappingToDelete] = useState<{ teacherUsername: string; className: string; subject: string } | null>(null);
-    const [teacherPermissions, setTeacherPermissions] = useState<any[]>([]);
+    const [teacherPermissions, setTeacherPermissions] = useState<TeacherPermission[]>([]);
 
     const handleSaveTopicDetails = async () => {
         if (!selectedClass || !selectedSubject || !selectedTopic || !topicDetails) return;
@@ -446,28 +448,14 @@ export default function TeacherDashboard() {
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
-                    const is11Or12 = ['Class_11', 'Class_12', 'Class_12+'].includes(selectedClass);
-                    const requiredSubjects = is11Or12
-                        ? ['Maths', 'Physics', 'Chemistry', 'Combined']
-                        : ['Maths', 'Physics', 'Chemistry', 'Biology'];
-                    const merged = Array.from(new Set([...data, ...requiredSubjects]));
-
-                    const sortOrder = requiredSubjects;
-                    const sortedSubjects = merged.sort((a, b) => {
-                        const idxA = sortOrder.indexOf(a);
-                        const idxB = sortOrder.indexOf(b);
-                        if (idxA === -1 && idxB === -1) return a.localeCompare(b);
-                        if (idxA === -1) return 1;
-                        if (idxB === -1) return -1;
-                        return idxA - idxB;
-                    });
+                    const sortedSubjects = sortSubjects(data, selectedClass);
 
                     setSubjects(sortedSubjects);
                     if (sortedSubjects.length > 0) {
                         let defaultSub = sortedSubjects[0];
                         if (isRegularTeacher && teacherPermissions.length > 0) {
                             const taughtSub = sortedSubjects.find(sub =>
-                                teacherPermissions.some((p: any) =>
+                                teacherPermissions.some((p: TeacherPermission) =>
                                     p.class_name.toLowerCase() === selectedClass.toLowerCase() &&
                                     p.subject.toLowerCase() === sub.toLowerCase()
                                 )
@@ -2541,7 +2529,7 @@ export default function TeacherDashboard() {
                                                                 onClick={() => {
                                                                     setEditingTeacherNameId(teacher.id);
                                                                     setEditedTeacherNameVal(teacher.name);
-                                                                    setEditedTeacherPasswordVal(teacher.password);
+                                                                    setEditedTeacherPasswordVal(teacher.password ?? '');
                                                                 }}
                                                                 style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer' }}
                                                                 title="Edit Teacher"

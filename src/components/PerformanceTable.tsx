@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { StudentPerformanceRecord } from '@/lib/types';
-
+import { toast } from 'react-hot-toast';
 
 function FlashHandler({ onFlash }: { onFlash: (topic: string) => void }) {
     const searchParams = useSearchParams();
@@ -227,7 +227,7 @@ export default function PerformanceTable({
 
     const saveBulk = async () => {
         if (!studentName || sortedData.length === 0) {
-            alert('Missing student information.');
+            toast.error('Missing student information.');
             return;
         }
 
@@ -245,12 +245,12 @@ export default function PerformanceTable({
 
             if (trimmedMarks !== '' && trimmedMarks !== 'NA') {
                 if (parsedMarks === null || Number.isNaN(parsedMarks) || parsedMarks < 0) {
-                    alert(`Row "${row.topic}": Enter a valid marks value, NA, or leave it blank for absent.`);
+                    toast.error(`Row "${row.topic}": Enter a valid marks value, NA, or leave it blank for absent.`);
                     return;
                 }
 
                 if (typeof row.totalMarks === 'number' && parsedMarks > row.totalMarks) {
-                    alert(`Row "${row.topic}": Marks cannot be greater than total marks (${row.totalMarks}).`);
+                    toast.error(`Row "${row.topic}": Marks cannot exceed total marks (${row.totalMarks}).`);
                     return;
                 }
             }
@@ -288,7 +288,7 @@ export default function PerformanceTable({
         } catch (error) {
             console.error(error);
             const message = error instanceof Error ? error.message : 'Failed to bulk update performance';
-            alert(message);
+            toast.error(message);
         } finally {
             setIsSavingBulk(false);
         }
@@ -296,7 +296,7 @@ export default function PerformanceTable({
 
     const saveRow = async (row: StudentPerformanceRecord) => {
         if (!studentName || !row.className) {
-            alert('Missing student or class information for this row.');
+            toast.error('Missing student or class information for this row.');
             return;
         }
 
@@ -305,12 +305,12 @@ export default function PerformanceTable({
 
         if (trimmedMarks !== '' && trimmedMarks !== 'NA') {
             if (parsedMarks === null || Number.isNaN(parsedMarks) || parsedMarks < 0) {
-                alert('Enter a valid marks value, NA, or leave it blank for absent.');
+                toast.error('Enter a valid marks value, NA, or leave it blank for absent.');
                 return;
             }
 
             if (typeof row.totalMarks === 'number' && parsedMarks > row.totalMarks) {
-                alert(`Marks cannot be greater than total marks (${row.totalMarks}).`);
+                toast.error(`Marks cannot exceed total marks (${row.totalMarks}).`);
                 return;
             }
         }
@@ -342,7 +342,7 @@ export default function PerformanceTable({
         } catch (error) {
             console.error(error);
             const message = error instanceof Error ? error.message : 'Failed to update performance';
-            alert(message);
+            toast.error(message);
         } finally {
             setSavingKey(null);
         }
