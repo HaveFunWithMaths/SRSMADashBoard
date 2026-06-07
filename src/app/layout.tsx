@@ -19,6 +19,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var width = 1200;
+                var screenWidth = window.screen.width;
+                if (screenWidth < width) {
+                  var scale = screenWidth / width;
+                  var viewport = document.querySelector('meta[name="viewport"]');
+                  if (viewport) {
+                    viewport.setAttribute('content', 'width=' + width + ', initial-scale=' + scale + ', minimum-scale=' + scale);
+                  }
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body>
         <Providers>
           {children}
